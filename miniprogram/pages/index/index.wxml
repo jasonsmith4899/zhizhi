@@ -1,0 +1,86 @@
+<view class="page">
+  <!-- Banner区域 -->
+  <view class="banner">
+    <view class="banner-content">
+      <view class="banner-icon">
+        <text class="icon-text">智</text>
+      </view>
+      <view class="banner-text">
+        <text class="banner-title">欢迎使用智知</text>
+        <text class="banner-desc">AI智能知识库，随时为您解答</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 功能区域 -->
+  <view class="section">
+    <view class="section-title">快速开始</view>
+
+    <!-- 新对话卡片 -->
+    <view class="action-card" bindtap="startChat">
+      <view class="action-icon chat-icon">
+        <text class="icon-emoji">💬</text>
+      </view>
+      <view class="action-info">
+        <text class="action-title">开始新对话</text>
+        <text class="action-desc">向AI知识库提问，获取精准答案</text>
+      </view>
+      <view class="action-arrow">
+        <text>›</text>
+      </view>
+    </view>
+
+    <!-- 历史对话卡片 -->
+    <view class="action-card" bindtap="goHistory">
+      <view class="action-icon history-icon">
+        <text class="icon-emoji">📋</text>
+      </view>
+      <view class="action-info">
+        <text class="action-title">历史对话</text>
+        <text class="action-desc">查看之前的对话记录</text>
+      </view>
+      <view class="action-arrow">
+        <text>›</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 功能特点 -->
+  <view class="section">
+    <view class="section-title">功能特点</view>
+    <view class="features">
+      <view class="feature-item">
+        <text class="feature-icon">🔍</text>
+        <text class="feature-name">智能检索</text>
+        <text class="feature-desc">从知识库中精准检索相关信息</text>
+      </view>
+      <view class="feature-item">
+        <text class="feature-icon">💡</text>
+        <text class="feature-name">精准回答</text>
+        <text class="feature-desc">基于检索结果生成准确回答</text>
+      </view>
+      <view class="feature-item">
+        <text class="feature-icon">📚</text>
+        <text class="feature-name">来源引用</text>
+        <text class="feature-desc">标注信息来源，可追溯可验证</text>
+      </view>
+      <view class="feature-item">
+        <text class="feature-icon">🔄</text>
+        <text class="feature-name">多轮对话</text>
+        <text class="feature-desc">支持上下文记忆的连续对话</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 登录状态提示 -->
+  <view class="login-status" wx:if="{{!isLoggedIn && !loading}}">
+    <text class="login-hint">正在自动登录...</text>
+  </view>
+
+  <!-- 加载状态 -->
+  <view class="loading-mask" wx:if="{{loading}}">
+    <view class="loading-spinner">
+      <text>加载中...</text>
+    </view>
+  </view>
+</view>

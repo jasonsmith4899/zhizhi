@@ -1,0 +1,57 @@
+<view class="page">
+  <!-- 用户信息卡片 -->
+  <view class="user-card">
+    <view class="user-avatar">
+      <text class="avatar-text">{{isLoggedIn ? '智' : '?'}}</text>
+    </view>
+    <view class="user-info" wx:if="{{isLoggedIn}}">
+      <text class="user-name">智知用户</text>
+      <text class="user-id">ID: {{userId}}</text>
+    </view>
+    <view class="user-info" wx:else>
+      <text class="user-name">未登录</text>
+      <text class="user-hint">点击下方按钮登录</text>
+    </view>
+  </view>
+
+  <!-- 功能列表 -->
+  <view class="menu-section">
+    <view class="menu-item" wx:if="{{isLoggedIn}}">
+      <view class="menu-icon">
+        <text>💬</text>
+      </view>
+      <text class="menu-text">对话历史</text>
+      <text class="menu-arrow">›</text>
+    </view>
+    <view class="menu-item" wx:if="{{isLoggedIn}}">
+      <view class="menu-icon">
+        <text>ℹ️</text>
+      </view>
+      <text class="menu-text">关于智知</text>
+      <text class="menu-arrow">›</text>
+    </view>
+  </view>
+
+  <!-- 操作按钮 -->
+  <view class="action-section">
+    <button
+      class="btn-logout"
+      wx:if="{{isLoggedIn}}"
+      bindtap="handleLogout"
+    >
+      退出登录
+    </button>
+    <button
+      class="btn-login"
+      wx:else
+      bindtap="handleRelogin"
+    >
+      重新登录
+    </button>
+  </view>
+
+  <!-- 版本信息 -->
+  <view class="version-info">
+    <text>智知 AI 知识库 v1.0.0</text>
+  </view>
+</view>

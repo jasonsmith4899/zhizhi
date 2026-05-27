@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  # ==================== 后端应用 ====================
+  backend:
+    build: ./backend
+    container_name: zhizhi-backend
+    ports:
+      - "8080:8080"
+    environment:
+      # 数据库 (连接已有的zhizhi-postgres)
+      DB_HOST: zhizhi-postgres
+      DB_PORT: 5432
+      DB_NAME: zhizhi
+      DB_USER: postgres
+      DB_PASSWORD: ${DB_PASSWORD}
+      # DeepSeek AI
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
+      # JWT
+      JWT_SECRET: ${JWT_SECRET}
+      # 微信小程序
+      WECHAT_APPID: ""
+      WECHAT_SECRET: ""
+      # JVM
+      JAVA_OPTS: "-Xms256m -Xmx512m"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  # ==================== 前端 (Nginx) ====================
+  frontend:
+    build: ./frontend
+    container_name: zhizhi-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped

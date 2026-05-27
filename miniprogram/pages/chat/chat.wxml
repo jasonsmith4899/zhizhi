@@ -1,0 +1,105 @@
+<view class="page">
+  <!-- 聊天消息列表 -->
+  <scroll-view
+    class="chat-list"
+    scroll-y
+    scroll-into-view="{{scrollToView}}"
+    scroll-with-animation
+    enhanced
+    show-scrollbar="{{false}}"
+  >
+    <!-- 欢迎消息 -->
+    <view class="welcome-msg" wx:if="{{messages.length === 0}}">
+      <view class="welcome-icon">
+        <text class="welcome-emoji">🤖</text>
+      </view>
+      <text class="welcome-title">你好！我是智知AI助手</text>
+      <text class="welcome-desc">我可以根据知识库内容回答你的问题，请输入你想问的问题。</text>
+    </view>
+
+    <!-- 消息列表 -->
+    <block wx:for="{{messages}}" wx:key="id">
+      <view
+        id="msg-{{index}}"
+        class="message-item {{item.role === 'user' ? 'msg-right' : 'msg-left'}}"
+      >
+        <!-- AI头像 -->
+        <view class="avatar" wx:if="{{item.role === 'assistant'}}">
+          <text class="avatar-text">AI</text>
+        </view>
+
+        <!-- 消息气泡 -->
+        <view class="bubble-wrap">
+          <view class="bubble {{item.role === 'user' ? 'bubble-user' : 'bubble-ai'}} {{item.isError ? 'bubble-error' : ''}}">
+            <text class="bubble-text" user-select>{{item.content}}</text>
+          </view>
+
+          <!-- 来源引用（AI消息） -->
+          <view class="sources-wrap" wx:if="{{item.sources && item.sources.length > 0}}">
+            <view class="sources-toggle" bindtap="toggleSources" data-idx="{{index}}">
+              <text class="sources-label">📎 {{item.sources.length}}条引用</text>
+              <text class="sources-arrow {{item.showSources ? 'arrow-up' : ''}}">›</text>
+            </view>
+            <view class="sources-list" wx:if="{{item.showSources}}">
+              <view
+                class="source-item"
+                wx:for="{{item.sources}}"
+                wx:for-item="src"
+                wx:key="documentName"
+              >
+                <view class="source-header">
+                  <text class="source-name">{{src.documentName}}</text>
+                  <text class="source-score" wx:if="{{src.score}}">{{src.score}}</text>
+                </view>
+                <text class="source-content">{{src.content}}</text>
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <!-- 用户头像 -->
+        <view class="avatar" wx:if="{{item.role === 'user'}}">
+          <text class="avatar-text user-avatar">我</text>
+        </view>
+      </view>
+    </block>
+
+    <!-- 加载中提示 -->
+    <view class="message-item msg-left" wx:if="{{loading}}">
+      <view class="avatar">
+        <text class="avatar-text">AI</text>
+      </view>
+      <view class="bubble-wrap">
+        <view class="bubble bubble-ai bubble-loading">
+          <view class="typing-dots">
+            <view class="dot dot1"></view>
+            <view class="dot dot2"></view>
+            <view class="dot dot3"></view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 底部占位 -->
+    <view class="bottom-placeholder"></view>
+  </scroll-view>
+
+  <!-- 输入区域 -->
+  <view class="input-bar">
+    <input
+      class="input-field"
+      placeholder="输入你的问题..."
+      value="{{inputText}}"
+      bindinput="onInputChange"
+      bindconfirm="onConfirmSend"
+      confirm-type="send"
+      disabled="{{loading}}"
+    />
+    <view
+      class="send-btn {{inputText ? 'send-btn-active' : ''}}"
+      bindtap="sendMessage"
+    >
+      <text>发送</text>
+    </view>
+  </view>
+</view>

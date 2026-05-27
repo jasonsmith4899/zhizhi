@@ -1,0 +1,44 @@
+<view class="page">
+  <!-- 会话列表 -->
+  <view class="conversation-list" wx:if="{{!loading && conversations.length > 0}}">
+    <view
+      class="conversation-item {{swipedIndex === index ? 'swiped' : ''}}"
+      wx:for="{{conversations}}"
+      wx:key="id"
+      data-idx="{{index}}"
+      data-id="{{item.id}}"
+      bindtouchstart="touchStart"
+      bindtouchmove="touchMove"
+      bindtouchend="touchEnd"
+    >
+      <view class="conversation-content" data-id="{{item.id}}" bindtap="enterChat">
+        <view class="conversation-info">
+          <text class="conversation-title">{{item.title || '新对话'}}</text>
+          <text class="conversation-time">{{item.updatedAtText}}</text>
+        </view>
+      </view>
+      <view
+        class="delete-btn"
+        data-id="{{item.id}}"
+        data-idx="{{index}}"
+        catchtap="deleteConversation"
+      >
+        <text>删除</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 空状态 -->
+  <view class="empty-state" wx:if="{{!loading && conversations.length === 0}}">
+    <text class="empty-icon">💬</text>
+    <text class="empty-text">暂无对话记录</text>
+    <text class="empty-hint">去首页开始新的对话吧</text>
+  </view>
+
+  <!-- 加载状态 -->
+  <view class="loading-state" wx:if="{{loading}}">
+    <view class="loading-spinner">
+      <text>加载中...</text>
+    </view>
+  </view>
+</view>

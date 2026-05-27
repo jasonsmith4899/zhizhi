@@ -1,0 +1,34 @@
+# 测试环境配置
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;MODE=PostgreSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+
+  flyway:
+    enabled: false
+
+  ai:
+    openai:
+      api-key: test-key
+      base-url: https://api.deepseek.com
+
+  cache:
+    type: simple
+
+app:
+  jwt:
+    secret: test-jwt-secret-key-for-unit-testing-purposes-only!!
+    expiration: 86400000
+
+  ai:
+    chunk-size: 500
+    chunk-overlap: 100
+    similarity-top-k: 5
+    similarity-threshold: 0.7
+    max-context-messages: 10

@@ -15,8 +15,6 @@ export interface User {
   username: string
   email: string
   plan: string
-  apiKey: string
-  apiKeyCreatedAt: string
 }
 
 export interface KnowledgeBase {

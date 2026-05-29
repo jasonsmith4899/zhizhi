@@ -1,68 +1,109 @@
 <script setup lang="ts">
-import { onMounted, ref, computed } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useAuthStore } from '../../stores/auth'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { generateApiKey, revokeApiKey } from '../../api/auth'
+import { listApiKeys, createApiKey, updateApiKey, deleteApiKey } from '../../api/apiKey'
+import { getKnowledgeBases } from '../../api/knowledge'
 
 const authStore = useAuthStore()
-const apiKeyLoading = ref(false)
+const apiKeys = ref<any[]>([])
+const knowledgeBases = ref<any[]>([])
+const loading = ref(false)
+const dialogVisible = ref(false)
+const dialogMode = ref<'create' | 'edit'>('create')
+const editingKey = ref<any>(null)
 
-onMounted(() => {
+// 表单
+const form = ref({
+  name: '',
+  description: '',
+  knowledgeBaseIds: [] as number[]
+})
+
+onMounted(async () => {
   authStore.fetchUser()
+  await Promise.all([loadApiKeys(), loadKnowledgeBases()])
 })
 
-const maskedApiKey = computed(() => {
-  const key = authStore.user?.apiKey
-  if (!key) return ''
-  if (key.length <= 8) return key
-  return key.substring(0, 4) + '****' + key.substring(key.length - 4)
-})
-
-async function handleGenerateApiKey() {
+async function loadApiKeys() {
   try {
-    await ElMessageBox.confirm(
-      '生成新API Key后，旧Key将立即失效，确定继续？',
-      '生成API Key',
-      { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' }
-    )
-    apiKeyLoading.value = true
-    const res = await generateApiKey()
-    if (res.code === 200) {
-      ElMessage.success('API Key 已生成')
-      authStore.fetchUser()
+    const res = await listApiKeys() as any
+    apiKeys.value = res.data || []
+  } catch {}
+}
+
+async function loadKnowledgeBases() {
+  try {
+    const res = await getKnowledgeBases() as any
+    knowledgeBases.value = res.data || []
+  } catch {}
+}
+
+function openCreateDialog() {
+  dialogMode.value = 'create'
+  form.value = { name: '', description: '', knowledgeBaseIds: [] }
+  dialogVisible.value = true
+}
+
+function openEditDialog(key: any) {
+  dialogMode.value = 'edit'
+  editingKey.value = key
+  form.value = {
+    name: key.name,
+    description: key.description || '',
+    knowledgeBaseIds: key.knowledgeBaseIds || []
+  }
+  dialogVisible.value = true
+}
+
+async function handleSubmit() {
+  if (form.value.knowledgeBaseIds.length === 0) {
+    ElMessage.warning('请至少选择一个知识库')
+    return
+  }
+  loading.value = true
+  try {
+    if (dialogMode.value === 'create') {
+      const res = await createApiKey(form.value) as any
+      if (res.code === 200) {
+        ElMessage.success('API Key 已创建，请立即复制保存，后续无法再次查看完整Key')
+        // 显示完整的 key
+        await ElMessageBox.alert(
+          `<div style="word-break: break-all; font-family: monospace; padding: 12px; background: #f5f7fa; border-radius: 4px">${res.data.keyValue}</div>`,
+          '新 API Key（请复制保存）',
+          { dangerouslyUseHTMLString: true, confirmButtonText: '我已保存' }
+        )
+      }
+    } else {
+      const res = await updateApiKey(editingKey.value.id, form.value) as any
+      if (res.code === 200) {
+        ElMessage.success('API Key 已更新')
+      }
     }
-  } catch (e) {
-    // 用户取消
+    dialogVisible.value = false
+    await loadApiKeys()
+  } catch (e: any) {
+    ElMessage.error(e.message || '操作失败')
   } finally {
-    apiKeyLoading.value = false
+    loading.value = false
   }
 }
 
-async function handleRevokeApiKey() {
+async function handleDelete(key: any) {
   try {
     await ElMessageBox.confirm(
-      '吊销后将无法使用此API Key调用接口，确定继续？',
-      '吊销API Key',
-      { confirmButtonText: '确定吊销', cancelButtonText: '取消', type: 'warning' }
+      `确定删除 API Key「${key.name}」？删除后将立即失效。`,
+      '删除 API Key',
+      { confirmButtonText: '确定删除', cancelButtonText: '取消', type: 'warning' }
     )
-    apiKeyLoading.value = true
-    const res = await revokeApiKey()
-    if (res.code === 200) {
-      ElMessage.success('API Key 已吊销')
-      authStore.fetchUser()
-    }
-  } catch (e) {
-    // 用户取消
-  } finally {
-    apiKeyLoading.value = false
-  }
+    await deleteApiKey(key.id)
+    ElMessage.success('已删除')
+    await loadApiKeys()
+  } catch {}
 }
 
-function copyApiKey() {
-  if (authStore.user?.apiKey) {
-    navigator.clipboard.writeText(authStore.user.apiKey)
-    ElMessage.success('API Key 已复制')
-  }
+function getKbName(id: number) {
+  return knowledgeBases.value.find(kb => kb.id === id)?.name || `#${id}`
 }
 
 const planMap: Record<string, { name: string; color: string; docs: string; queries: string }> = {
@@ -115,37 +156,54 @@ const planMap: Record<string, { name: string; color: string; docs: string; queri
       </el-col>
     </el-row>
 
-    <!-- API Key -->
+    <!-- API Key 管理 -->
     <el-card style="margin-top: 20px">
       <template #header>
-        <span style="font-weight: 600">API Key</span>
+        <div style="display: flex; justify-content: space-between; align-items: center">
+          <span style="font-weight: 600">API Key 管理</span>
+          <el-button type="primary" size="small" @click="openCreateDialog">+ 新建 Key</el-button>
+        </div>
       </template>
+
       <el-alert type="info" :closable="false" style="margin-bottom: 16px">
-        API Key 用于通过 API 接口调用智能问答服务，通过 <code>X-API-Key</code> 请求头传递。请妥善保管，不要泄露给他人。
+        API Key 用于通过 API 接口调用智能问答服务，通过 <code>X-API-Key</code> 请求头传递。
+        每个 Key 必须关联至少一个知识库，调用时只能访问已关联的知识库。
       </el-alert>
 
-      <div v-if="authStore.user?.apiKey">
-        <el-descriptions :column="1" border style="margin-bottom: 16px">
-          <el-descriptions-item label="API Key">
-            <span style="font-family: monospace">{{ maskedApiKey }}</span>
-          </el-descriptions-item>
-          <el-descriptions-item label="生成时间">
-            {{ authStore.user?.apiKeyCreatedAt || '未知' }}
-          </el-descriptions-item>
-        </el-descriptions>
+      <el-table v-if="apiKeys.length > 0" :data="apiKeys" stripe>
+        <el-table-column prop="name" label="名称" width="150" />
+        <el-table-column label="Key" min-width="200">
+          <template #default="{ row }">
+            <code style="font-size: 13px">{{ row.keyValue }}</code>
+          </template>
+        </el-table-column>
+        <el-table-column label="关联知识库" min-width="200">
+          <template #default="{ row }">
+            <template v-if="row.knowledgeBaseIds && row.knowledgeBaseIds.length > 0">
+              <el-tag v-for="kbId in row.knowledgeBaseIds" :key="kbId" size="small" style="margin: 2px">
+                {{ getKbName(kbId) }}
+              </el-tag>
+            </template>
+            <el-tag v-else type="danger" size="small">未配置</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="description" label="描述" width="200" show-overflow-tooltip />
+        <el-table-column label="创建时间" width="180">
+          <template #default="{ row }">
+            {{ row.createdAt ? new Date(row.createdAt).toLocaleString('zh-CN') : '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="200" fixed="right">
+          <template #default="{ row }">
+            <el-button type="primary" link size="small" @click="openEditDialog(row)">编辑</el-button>
+            <el-button type="danger" link size="small" @click="handleDelete(row)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
 
-        <div style="display: flex; gap: 12px">
-          <el-button type="primary" @click="copyApiKey">复制完整Key</el-button>
-          <el-button type="warning" :loading="apiKeyLoading" @click="handleGenerateApiKey">重新生成</el-button>
-          <el-button type="danger" :loading="apiKeyLoading" @click="handleRevokeApiKey">吊销</el-button>
-        </div>
-      </div>
-
-      <div v-else>
-        <el-empty description="尚未生成API Key">
-          <el-button type="primary" :loading="apiKeyLoading" @click="handleGenerateApiKey">生成API Key</el-button>
-        </el-empty>
-      </div>
+      <el-empty v-else description="尚未创建 API Key">
+        <el-button type="primary" @click="openCreateDialog">创建 API Key</el-button>
+      </el-empty>
     </el-card>
 
     <!-- 操作 -->
@@ -155,5 +213,45 @@ const planMap: Record<string, { name: string; color: string; docs: string; queri
       </template>
       <el-button type="danger" @click="authStore.logout(); $router.push('/login')">退出登录</el-button>
     </el-card>
+
+    <!-- 新建/编辑对话框 -->
+    <el-dialog
+      v-model="dialogVisible"
+      :title="dialogMode === 'create' ? '新建 API Key' : '编辑 API Key'"
+      width="500px"
+    >
+      <el-form label-width="100px">
+        <el-form-item label="名称">
+          <el-input v-model="form.name" placeholder="给 Key 起个名字，如：生产环境、测试环境" />
+        </el-form-item>
+        <el-form-item label="描述">
+          <el-input v-model="form.description" type="textarea" :rows="2" placeholder="可选描述" />
+        </el-form-item>
+        <el-form-item label="关联知识库">
+          <el-select
+            v-model="form.knowledgeBaseIds"
+            multiple
+            placeholder="请选择关联的知识库（至少选一个）"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="kb in knowledgeBases"
+              :key="kb.id"
+              :label="kb.name"
+              :value="kb.id"
+            />
+          </el-select>
+          <div style="font-size: 12px; color: #999; margin-top: 4px">
+            必须至少关联一个知识库
+          </div>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="loading" @click="handleSubmit">
+          {{ dialogMode === 'create' ? '创建' : '保存' }}
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>

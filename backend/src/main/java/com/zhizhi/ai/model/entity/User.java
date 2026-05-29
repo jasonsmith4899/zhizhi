@@ -32,12 +32,6 @@ public class User {
     @Builder.Default
     private String plan = "free";  // free / basic / pro
 
-    @Column(name = "api_key", unique = true, length = 64)
-    private String apiKey;
-
-    @Column(name = "api_key_created_at")
-    private LocalDateTime apiKeyCreatedAt;
-
     @Column(name = "refresh_token_version")
     @Builder.Default
     private Integer refreshTokenVersion = 0;

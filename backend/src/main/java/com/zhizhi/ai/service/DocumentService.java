@@ -303,7 +303,7 @@ public class DocumentService {
         Integer vectorCount = 0;
         try {
             vectorCount = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM document_chunks WHERE metadata->>'document_id' = ?",
+                "SELECT COUNT(*) FROM vector_chunks WHERE metadata->>'document_id' = ?",
                 Integer.class, documentId.toString());
         } catch (Exception e) {
             log.warn("Failed to query vector count", e);
@@ -334,7 +334,7 @@ public class DocumentService {
         }
 
         try {
-            jdbcTemplate.update("DELETE FROM document_chunks WHERE metadata->>'document_id' = ?",
+            jdbcTemplate.update("DELETE FROM vector_chunks WHERE metadata->>'document_id' = ?",
                 documentId.toString());
         } catch (Exception e) {
             log.warn("Failed to delete vectors from vector store", e);
@@ -459,7 +459,7 @@ public class DocumentService {
                 chunkRepository.deleteByDocumentId(docId);
             }
             try {
-                jdbcTemplate.update("DELETE FROM document_chunks WHERE metadata->>'document_id' = ?",
+                jdbcTemplate.update("DELETE FROM vector_chunks WHERE metadata->>'document_id' = ?",
                     docId.toString());
             } catch (Exception e) {
                 log.warn("Failed to delete vectors for document {}", docId, e);

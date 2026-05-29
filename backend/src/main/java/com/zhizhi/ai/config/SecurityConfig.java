@@ -1,6 +1,7 @@
 package com.zhizhi.ai.config;
 
 import com.zhizhi.ai.common.JwtUtil;
+import com.zhizhi.ai.repository.ApiKeyRepository;
 import com.zhizhi.ai.repository.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zhizhi.ai.common.Result;
@@ -98,6 +99,7 @@ public class SecurityConfig {
         private final UserDetailsService userDetailsService;
         private final ObjectMapper objectMapper;
         private final UserRepository userRepository;
+        private final ApiKeyRepository apiKeyRepository;
 
         @Override
         protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
@@ -108,20 +110,25 @@ public class SecurityConfig {
                 // 检查API Key
                 String apiKey = request.getHeader("X-API-Key");
                 if (apiKey != null && !apiKey.isBlank()) {
-                    var user = userRepository.findByApiKey(apiKey).orElse(null);
-                    if (user != null) {
-                        UserDetails userDetails = org.springframework.security.core.userdetails.User.builder()
-                                .username(user.getUsername())
-                                .password(user.getPassword())
-                                .authorities("ROLE_USER")
-                                .build();
+                    var apiKeyOpt = apiKeyRepository.findByKeyValue(apiKey);
+                    if (apiKeyOpt.isPresent()) {
+                        var apiKeyEntity = apiKeyOpt.get();
+                        var user = userRepository.findById(apiKeyEntity.getUserId()).orElse(null);
+                        if (user != null) {
+                            UserDetails userDetails = org.springframework.security.core.userdetails.User.builder()
+                                    .username(user.getUsername())
+                                    .password(user.getPassword())
+                                    .authorities("ROLE_USER")
+                                    .build();
 
-                        UsernamePasswordAuthenticationToken authentication =
-                                new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
-                        authentication.setDetails(user.getId());
-                        SecurityContextHolder.getContext().setAuthentication(authentication);
-                        filterChain.doFilter(request, response);
-                        return;
+                            UsernamePasswordAuthenticationToken authentication =
+                                    new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+                            // 存储 userId 和 apiKeyId，供后续使用
+                            authentication.setDetails(new ApiKeyAuthDetail(user.getId(), apiKeyEntity.getId()));
+                            SecurityContextHolder.getContext().setAuthentication(authentication);
+                            filterChain.doFilter(request, response);
+                            return;
+                        }
                     }
                     // API Key无效，返回401
                     response.setStatus(401);
@@ -154,6 +161,11 @@ public class SecurityConfig {
             filterChain.doFilter(request, response);
         }
     }
+
+    /**
+     * API Key 认证时携带的详情
+     */
+    public record ApiKeyAuthDetail(Long userId, Long apiKeyId) {}
 
     /**
      * UserDetailsService实现

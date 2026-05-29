@@ -1,11 +1,14 @@
 package com.zhizhi.ai.service;
 
+import com.zhizhi.ai.common.AuthUtil;
 import com.zhizhi.ai.common.BusinessException;
 import com.zhizhi.ai.common.TenantContext;
 import com.zhizhi.ai.model.dto.ChatRequest;
 import com.zhizhi.ai.model.dto.ChatResponse;
+import com.zhizhi.ai.model.entity.ApiKey;
 import com.zhizhi.ai.model.entity.Conversation;
 import com.zhizhi.ai.model.entity.Message;
+import com.zhizhi.ai.repository.ApiKeyRepository;
 import com.zhizhi.ai.repository.ConversationRepository;
 import com.zhizhi.ai.repository.KnowledgeBaseRepository;
 import com.zhizhi.ai.repository.MessageRepository;
@@ -20,6 +23,7 @@ import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -41,6 +45,8 @@ public class ChatService {
     private final KnowledgeBaseRepository knowledgeBaseRepository;
     private final MessageRepository messageRepository;
     private final UserRepository userRepository;
+    private final ApiKeyRepository apiKeyRepository;
+    private final AuthUtil authUtil;
     private final ChatMemory chatMemory;
 
     @Value("${app.ai.similarity-top-k:5}")
@@ -68,12 +74,16 @@ public class ChatService {
             KnowledgeBaseRepository knowledgeBaseRepository,
             MessageRepository messageRepository,
             UserRepository userRepository,
+            ApiKeyRepository apiKeyRepository,
+            AuthUtil authUtil,
             ChatMemory chatMemory) {
         this.vectorStore = vectorStore;
         this.conversationRepository = conversationRepository;
         this.knowledgeBaseRepository = knowledgeBaseRepository;
         this.messageRepository = messageRepository;
         this.userRepository = userRepository;
+        this.apiKeyRepository = apiKeyRepository;
+        this.authUtil = authUtil;
         this.chatMemory = chatMemory;
         this.chatModel = chatModel;
 
@@ -90,8 +100,30 @@ public class ChatService {
                 .build();
     }
 
+    /**
+     * 校验 API Key 对知识库的访问权限
+     */
+    private void validateKnowledgeBaseAccess(Authentication authentication, Long knowledgeBaseId) {
+        if (authentication == null || !authUtil.isApiKeyAuth(authentication)) {
+            return; // JWT 认证不做额外校验
+        }
+        Long apiKeyId = authUtil.getApiKeyId(authentication);
+        if (apiKeyId == null) return;
+
+        ApiKey apiKey = apiKeyRepository.findById(apiKeyId).orElse(null);
+        if (apiKey == null) return;
+
+        if (!apiKey.canAccessKnowledgeBase(knowledgeBaseId)) {
+            if (apiKey.getKnowledgeBases() == null || apiKey.getKnowledgeBases().isEmpty()) {
+                throw BusinessException.forbidden("此 API Key 未关联任何知识库，请先在设置中配置");
+            }
+            throw BusinessException.forbidden("此 API Key 无权访问该知识库");
+        }
+    }
+
     @Transactional
-    public ChatResponse chat(ChatRequest request, Long userId) {
+    public ChatResponse chat(ChatRequest request, Long userId, Authentication authentication) {
+        validateKnowledgeBaseAccess(authentication, request.getKnowledgeBaseId());
         Conversation conversation = getOrCreateConversation(request, userId);
         String sessionId = conversation.getSessionId();
         Long tenantId = conversation.getTenantId();
@@ -107,40 +139,27 @@ public class ChatService {
         String reply;
         List<ChatResponse.SourceReference> sources = new ArrayList<>();
 
-        if (request.getKnowledgeBaseId() != null) {
-            try {
-                RagContext ragCtx = buildRagContext(request.getMessage(), request.getKnowledgeBaseId());
-                sources = ragCtx.sources();
+        // knowledgeBaseId 已通过 @NotNull 校验，必不为 null
+        try {
+            RagContext ragCtx = buildRagContext(request.getMessage(), request.getKnowledgeBaseId());
+            sources = ragCtx.sources();
 
-                ChatClient ragClient = chatClient;
-                if (ragCtx.systemPrompt() != null) {
-                    ragClient = ChatClient.builder(chatModel)
-                            .defaultSystem(ragCtx.systemPrompt())
-                            .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
-                            .build();
-                }
-                reply = ragClient
-                        .prompt()
-                        .user(ragCtx.augmentedPrompt())
-                        .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, sessionId))
-                        .call()
-                        .content();
-            } catch (Exception e) {
-                log.warn("RAG failed, falling back to basic chat", e);
-                reply = chatClient
-                        .prompt()
-                        .user(request.getMessage())
-                        .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, sessionId))
-                        .call()
-                        .content();
+            ChatClient ragClient = chatClient;
+            if (ragCtx.systemPrompt() != null) {
+                ragClient = ChatClient.builder(chatModel)
+                        .defaultSystem(ragCtx.systemPrompt())
+                        .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
+                        .build();
             }
-        } else {
-            reply = chatClient
+            reply = ragClient
                     .prompt()
-                    .user(request.getMessage())
+                    .user(ragCtx.augmentedPrompt())
                     .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, sessionId))
                     .call()
                     .content();
+        } catch (Exception e) {
+            log.error("RAG chat failed", e);
+            throw new BusinessException("对话失败，请稍后重试");
         }
 
         String sourcesJson = sources.isEmpty() ? null : toJson(sources);
@@ -168,7 +187,8 @@ public class ChatService {
                 .build();
     }
 
-    public SseEmitter streamChat(ChatRequest request, Long userId) {
+    public SseEmitter streamChat(ChatRequest request, Long userId, Authentication authentication) {
+        validateKnowledgeBaseAccess(authentication, request.getKnowledgeBaseId());
         SseEmitter emitter = new SseEmitter(sseTimeout);
 
         Conversation conversation = getOrCreateConversation(request, userId);
@@ -189,13 +209,14 @@ public class ChatService {
         try {
             String augmentedPrompt = request.getMessage();
             String systemPrompt = null;
+            List<ChatResponse.SourceReference> ragSources = new ArrayList<>();
 
-            if (request.getKnowledgeBaseId() != null) {
-                RagContext ragCtx = buildRagContext(request.getMessage(), request.getKnowledgeBaseId());
-                augmentedPrompt = ragCtx.augmentedPrompt();
-                systemPrompt = ragCtx.systemPrompt();
-                sources = ragCtx.sources();
-            }
+            // knowledgeBaseId 已通过 @NotNull 校验，必不为 null
+            RagContext ragCtx = buildRagContext(request.getMessage(), request.getKnowledgeBaseId());
+            augmentedPrompt = ragCtx.augmentedPrompt();
+            systemPrompt = ragCtx.systemPrompt();
+            ragSources.addAll(ragCtx.sources());
+            final List<ChatResponse.SourceReference> finalSources = ragSources;
 
             ChatClient.Builder clientBuilder;
             if (systemPrompt != null) {
@@ -236,10 +257,10 @@ public class ChatService {
                     })
                     .doOnComplete(() -> {
                         try {
-                            if (!sources.isEmpty()) {
+                            if (!finalSources.isEmpty()) {
                                 emitter.send(SseEmitter.event()
                                         .name("sources")
-                                        .data(toJson(sources)));
+                                        .data(toJson(finalSources)));
                             }
 
                             emitter.send(SseEmitter.event()
@@ -251,7 +272,7 @@ public class ChatService {
                                     .tenantId(tenantId)
                                     .role("assistant")
                                     .content(fullReply.toString())
-                                    .sourceDocuments(sources.isEmpty() ? null : toJson(sources))
+                                    .sourceDocuments(finalSources.isEmpty() ? null : toJson(finalSources))
                                     .build();
                             messageRepository.save(assistantMsg);
 

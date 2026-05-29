@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
+import { ElMessage } from 'element-plus'
 import { getKnowledgeBases, getDocumentPreview } from '../../api/knowledge'
 import { useChatStore } from '../../stores/chat'
 import { useChatStream } from '../../composables/useChatStream'
@@ -33,6 +34,10 @@ onUnmounted(() => {
 })
 
 function handleSend(text: string) {
+  if (!selectedKbId.value) {
+    ElMessage.warning('请先选择知识库')
+    return
+  }
   send(text)
 }
 

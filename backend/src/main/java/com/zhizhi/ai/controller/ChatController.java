@@ -29,7 +29,7 @@ public class ChatController {
     public Result<ChatResponse> chat(@Valid @RequestBody ChatRequest request,
                                       Authentication authentication) {
         Long userId = authUtil.getUserId(authentication);
-        return Result.ok(chatService.chat(request, userId));
+        return Result.ok(chatService.chat(request, userId, authentication));
     }
 
     @PostMapping("/stream")
@@ -37,7 +37,7 @@ public class ChatController {
     public SseEmitter stream(@Valid @RequestBody ChatRequest request,
                               Authentication authentication) {
         Long userId = authUtil.getUserId(authentication);
-        return chatService.streamChat(request, userId);
+        return chatService.streamChat(request, userId, authentication);
     }
 
     @GetMapping("/conversations")

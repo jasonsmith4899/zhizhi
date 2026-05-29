@@ -11,15 +11,3 @@ export function register(data: { username: string; email: string; password: stri
 export function getCurrentUser() {
   return request.get('/auth/me')
 }
-
-export function generateApiKey() {
-  return request.post('/auth/api-key')
-}
-
-export function revokeApiKey() {
-  return request.delete('/auth/api-key')
-}
-
-export function getApiKey() {
-  return request.get('/auth/api-key')
-}

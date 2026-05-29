@@ -104,7 +104,7 @@ public class KnowledgeService {
 
         // 4. 删除向量（同时按knowledge_base_id和tenant_id过滤，防止误删其他租户数据）
         int vectorsDeleted = jdbcTemplate.update(
-            "DELETE FROM document_chunks WHERE metadata->>'knowledge_base_id' = ? AND metadata->>'tenant_id' = ?",
+            "DELETE FROM vector_chunks WHERE metadata->>'knowledge_base_id' = ? AND metadata->>'tenant_id' = ?",
             id.toString(), tenantId.toString());
         log.info("删除知识库 {} 关联向量 {} 条", id, vectorsDeleted);
 

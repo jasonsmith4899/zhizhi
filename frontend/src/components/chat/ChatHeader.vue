@@ -16,8 +16,7 @@ defineEmits<{
       <span style="font-weight: 600; font-size: 16px">AI 对话</span>
       <el-select
         :model-value="selectedKbId"
-        placeholder="通用对话"
-        clearable
+        placeholder="请选择知识库"
         size="small"
         style="width: 200px"
         @update:model-value="$emit('update:selectedKbId', $event)"
@@ -30,7 +29,6 @@ defineEmits<{
         />
       </el-select>
       <el-tag v-if="selectedKbId" type="success" size="small">RAG 模式</el-tag>
-      <el-tag v-else type="info" size="small">通用对话</el-tag>
     </div>
     <el-button size="small" @click="$emit('newChat')">新对话</el-button>
   </div>

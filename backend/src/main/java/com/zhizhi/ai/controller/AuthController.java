@@ -42,26 +42,4 @@ public class AuthController {
         var user = authService.getCurrentUser(authentication.getName());
         return Result.ok(UserDTO.fromEntity(user));
     }
-
-    @PostMapping("/api-key")
-    public Result<Map<String, Object>> generateApiKey(Authentication authentication) {
-        var user = authService.getCurrentUser(authentication.getName());
-        return Result.ok(authService.generateApiKey(user.getId()));
-    }
-
-    @DeleteMapping("/api-key")
-    public Result<Void> revokeApiKey(Authentication authentication) {
-        var user = authService.getCurrentUser(authentication.getName());
-        authService.revokeApiKey(user.getId());
-        return Result.ok();
-    }
-
-    @GetMapping("/api-key")
-    public Result<Map<String, Object>> getApiKey(Authentication authentication) {
-        var user = authService.getCurrentUser(authentication.getName());
-        return Result.ok(Map.of(
-                "apiKey", user.getApiKey() != null ? user.getApiKey() : "",
-                "apiKeyCreatedAt", user.getApiKeyCreatedAt() != null ? user.getApiKeyCreatedAt().toString() : ""
-        ));
-    }
 }

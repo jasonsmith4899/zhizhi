@@ -12,6 +12,23 @@
     </view>
   </view>
 
+  <!-- 知识库选择 -->
+  <view class="section" wx:if="{{knowledgeBases.length > 0}}">
+    <view class="section-title">选择知识库</view>
+    <view class="kb-list">
+      <view
+        class="kb-item {{selectedKbId === item.id ? 'kb-item-active' : ''}}"
+        wx:for="{{knowledgeBases}}"
+        wx:key="id"
+        bindtap="onSelectKb"
+        data-id="{{item.id}}"
+      >
+        <text class="kb-name">{{item.name}}</text>
+        <text class="kb-check" wx:if="{{selectedKbId === item.id}}">✓</text>
+      </view>
+    </view>
+  </view>
+
   <!-- 功能区域 -->
   <view class="section">
     <view class="section-title">快速开始</view>
@@ -23,7 +40,7 @@
       </view>
       <view class="action-info">
         <text class="action-title">开始新对话</text>
-        <text class="action-desc">向AI知识库提问，获取精准答案</text>
+        <text class="action-desc">{{selectedKbId ? '向AI知识库提问，获取精准答案' : '请先选择知识库'}}</text>
       </view>
       <view class="action-arrow">
         <text>›</text>

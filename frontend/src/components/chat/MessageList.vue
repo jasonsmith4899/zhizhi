@@ -57,14 +57,7 @@ defineExpose({ scrollToBottom })
       />
     </div>
 
-    <div v-if="loading && messages[messages.length - 1]?.content === ''" class="msg-row assistant">
-      <div class="msg-avatar">🤖</div>
-      <div class="msg-bubble">
-        <div class="typing-indicator">
-          <span></span><span></span><span></span>
-        </div>
-      </div>
-    </div>
+    <!-- typing indicator 已移入 MessageBubble，避免重复气泡 -->
   </div>
 </template>
 
@@ -121,21 +114,5 @@ defineExpose({ scrollToBottom })
   line-height: 1.6;
   font-size: 14px;
 }
-.typing-indicator {
-  display: flex;
-  gap: 4px;
-}
-.typing-indicator span {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #909399;
-  animation: bounce 1.4s infinite ease-in-out;
-}
-.typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
-.typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
-@keyframes bounce {
-  0%, 80%, 100% { transform: scale(0); }
-  40% { transform: scale(1); }
-}
+
 </style>

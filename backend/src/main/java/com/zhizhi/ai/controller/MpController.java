@@ -5,8 +5,10 @@ import com.zhizhi.ai.common.Result;
 import com.zhizhi.ai.model.dto.ChatRequest;
 import com.zhizhi.ai.model.dto.ChatResponse;
 import com.zhizhi.ai.model.dto.ConversationDTO;
+import com.zhizhi.ai.model.dto.KnowledgeBaseDTO;
 import com.zhizhi.ai.model.dto.MessageDTO;
 import com.zhizhi.ai.service.ChatService;
+import com.zhizhi.ai.service.KnowledgeService;
 import com.zhizhi.ai.service.StatsService;
 import com.zhizhi.ai.service.WechatService;
 import jakarta.validation.Valid;
@@ -27,6 +29,7 @@ public class MpController {
 
     private final WechatService wechatService;
     private final ChatService chatService;
+    private final KnowledgeService knowledgeService;
     private final StatsService statsService;
     private final AuthUtil authUtil;
 
@@ -42,13 +45,26 @@ public class MpController {
     }
 
     /**
+     * 获取当前租户的知识库列表（小程序端）
+     */
+    @GetMapping("/knowledge-bases")
+    public Result<List<KnowledgeBaseDTO>> knowledgeBases(Authentication authentication) {
+        Long userId = authUtil.getUserId(authentication);
+        List<KnowledgeBaseDTO> dtos = knowledgeService.listByUser(userId)
+                .stream()
+                .map(KnowledgeBaseDTO::fromEntity)
+                .toList();
+        return Result.ok(dtos);
+    }
+
+    /**
      * 小程序端对话
      */
     @PostMapping("/chat")
     public Result<ChatResponse> chat(@Valid @RequestBody ChatRequest request,
                                       Authentication authentication) {
         Long userId = authUtil.getUserId(authentication);
-        return Result.ok(chatService.chat(request, userId));
+        return Result.ok(chatService.chat(request, userId, authentication));
     }
 
     /**

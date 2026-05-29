@@ -20,6 +20,7 @@ public class ConversationDTO {
     private String channel;
     private Integer messageCount;
     private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 
     public static ConversationDTO fromEntity(Conversation conversation) {
         return ConversationDTO.builder()
@@ -29,6 +30,7 @@ public class ConversationDTO {
                 .channel(conversation.getChannel())
                 .messageCount(conversation.getMessageCount())
                 .createdAt(conversation.getCreatedAt())
+                .updatedAt(conversation.getUpdatedAt())
                 .build();
     }
 }

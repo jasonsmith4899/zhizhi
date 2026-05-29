@@ -7,7 +7,6 @@ import {
   uploadDocument,
   deleteDocument,
   updateKnowledgeBase,
-  getDocumentChunks,
   getVectorStatus,
   reVectorize,
   batchDeleteDocuments,

@@ -5,7 +5,9 @@ Page({
   data: {
     isLoggedIn: false,
     userId: '',
-    loading: true
+    loading: true,
+    knowledgeBases: [],
+    selectedKbId: null
   },
 
   onLoad() {
@@ -13,7 +15,6 @@ Page({
   },
 
   onShow() {
-    // 每次显示页面时检查登录态
     this.checkLoginStatus()
   },
 
@@ -31,6 +32,7 @@ Page({
     try {
       await ensureLogin()
       this.checkLoginStatus()
+      await this.loadKnowledgeBases()
     } catch (err) {
       console.error('登录失败:', err)
       wx.showToast({ title: '登录失败，请重试', icon: 'none' })
@@ -39,26 +41,46 @@ Page({
     }
   },
 
-  // 开始新对话
+  async loadKnowledgeBases() {
+    try {
+      const res = await request({ url: '/api/mp/knowledge-bases' })
+      const kbs = res.data || res || []
+      this.setData({ knowledgeBases: kbs })
+      // 如果只有一个知识库，自动选中
+      if (kbs.length === 1) {
+        this.setData({ selectedKbId: kbs[0].id })
+      }
+    } catch (err) {
+      console.error('加载知识库失败:', err)
+    }
+  },
+
+  onSelectKb(e) {
+    const kbId = e.currentTarget.dataset.id
+    this.setData({ selectedKbId: kbId })
+  },
+
   startChat() {
     if (!this.data.isLoggedIn) {
       wx.showToast({ title: '请先登录', icon: 'none' })
       this.initLogin()
       return
     }
+    if (!this.data.selectedKbId) {
+      wx.showToast({ title: '请先选择知识库', icon: 'none' })
+      return
+    }
     wx.navigateTo({
-      url: '/pages/chat/chat'
+      url: '/pages/chat/chat?knowledgeBaseId=' + this.data.selectedKbId
     })
   },
 
-  // 跳转到历史对话
   goHistory() {
     wx.switchTab({
       url: '/pages/history/history'
     })
   },
 
-  // 下拉刷新
   onPullDownRefresh() {
     this.initLogin().finally(() => {
       wx.stopPullDownRefresh()

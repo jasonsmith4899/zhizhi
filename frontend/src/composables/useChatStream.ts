@@ -27,6 +27,7 @@ export function useChatStream() {
 
   async function send(text: string) {
     if (!text.trim() || loading.value) return
+    if (!selectedKbId.value) return
 
     abort()
     abortController = new AbortController()

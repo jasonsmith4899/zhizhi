@@ -8,12 +8,18 @@ Page({
     sessionId: '',
     loading: false,
     scrollToView: '',
-    showSources: {}
+    showSources: {},
+    knowledgeBaseId: null
   },
 
   onLoad(options) {
     this.scrollTop = 0
     this.messageCount = 0
+
+    // 接收知识库ID
+    if (options.knowledgeBaseId) {
+      this.setData({ knowledgeBaseId: Number(options.knowledgeBaseId) })
+    }
 
     // 如果传入sessionId则加载历史对话
     if (options.sessionId) {
@@ -82,6 +88,11 @@ Page({
     const text = this.data.inputText.trim()
     if (!text || this.data.loading) return
 
+    if (!this.data.knowledgeBaseId) {
+      wx.showToast({ title: '请先选择知识库', icon: 'none' })
+      return
+    }
+
     // 添加用户消息
     const userMsg = {
       id: 'user_' + Date.now(),
@@ -104,6 +115,7 @@ Page({
         method: 'POST',
         data: {
           message: text,
+          knowledgeBaseId: this.data.knowledgeBaseId,
           sessionId: this.data.sessionId
         }
       })

@@ -3,10 +3,10 @@
 -- 启用 pg_trgm 扩展（支持模糊匹配）
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
--- 为 document_chunks 表添加 tsvector 列
+-- 为 document_chunks 表添加 tsvector 列（使用 simple 分词器以支持所有PostgreSQL版本）
 ALTER TABLE document_chunks
 ADD COLUMN IF NOT EXISTS content_tsvector tsvector
-GENERATED ALWAYS AS (to_tsvector('chinese', content)) STORED;
+GENERATED ALWAYS AS (to_tsvector('simple', content)) STORED;
 
 -- 为全文搜索创建 GIN 索引（CHINESE 分词）
 CREATE INDEX IF NOT EXISTS idx_document_chunks_content_tsvector

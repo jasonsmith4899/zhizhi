@@ -100,13 +100,13 @@ public class HybridRetrievalService {
         try {
             List<Long> kbIdList = new ArrayList<>(kbIds);
 
-            // 使用 PostgreSQL tsvector 进行全文搜索
+            // 使用 PostgreSQL tsvector 进行全文搜索（使用 simple 分词器支持所有PostgreSQL版本）
             String sql = """
                     SELECT dc.* FROM document_chunks dc
                     WHERE dc.knowledge_base_id IN (:kbIds)
                     AND dc.tenant_id = :tenantId
-                    AND dc.content_tsvector @@ plainto_tsquery('chinese', :query)
-                    ORDER BY ts_rank(dc.content_tsvector, plainto_tsquery('chinese', :query)) DESC
+                    AND dc.content_tsvector @@ plainto_tsquery('simple', :query)
+                    ORDER BY ts_rank(dc.content_tsvector, plainto_tsquery('simple', :query)) DESC
                     LIMIT :limit
                     """;
 

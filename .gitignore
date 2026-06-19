@@ -20,10 +20,13 @@ desktop.ini
 *.log
 logs/
 
-# Environment
+# Environment (keep .env.example as template, ignore actual values)
 .env
 .env.local
 .env.*.local
+.env.production
+!.env.example
+!.env.production.example
 
 # Maven
 backend/.mvn/
@@ -33,3 +36,17 @@ backend/mvnw.cmd
 # Data
 data/
 pgdata/
+
+# Documentation (exclude project-specific docs, keep only README.md)
+CLAUDE.md
+ENV_SETUP_GUIDE.md
+ENV_MIGRATION_REPORT.md
+DEPLOYMENT_CHECKLIST.md
+FULLTEXT_RERANK_INTEGRATION.md
+IMPLEMENTATION_SUMMARY.md
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*.swo

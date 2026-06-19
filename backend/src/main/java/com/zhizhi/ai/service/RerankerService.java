@@ -115,14 +115,22 @@ public class RerankerService {
         }
 
         results.forEach(result -> {
-            int index = result.get("index").asInt();
-            double score = result.get("score").asDouble();
+            JsonNode indexNode = result.get("index");
+            JsonNode scoreNode = result.get("score");
+            if (indexNode == null || scoreNode == null) {
+                log.warn("Reranker 响应中缺少必要字段");
+                return;
+            }
+
+            int index = indexNode.asInt();
+            double score = scoreNode.asDouble();
 
             if (index >= 0 && index < candidates.size()) {
                 Document doc = candidates.get(index);
-                // 创建新的 Document 对象，保留原有 metadata，更新 score
-                Document rerankDoc = new Document(doc.getText(), doc.getMetadata());
-                rerankDoc.setScore(score);
+                // 创建新的 Document 对象，保留原有 metadata，使用得分更新
+                Map<String, Object> metadata = new HashMap<>(doc.getMetadata());
+                Document rerankDoc = new Document(doc.getText(), metadata);
+                rerankDoc.score = score;  // 直接赋值 score 字段
                 reranked.add(rerankDoc);
             }
         });

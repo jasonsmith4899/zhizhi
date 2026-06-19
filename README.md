@@ -808,20 +808,5 @@ mvn test jacoco:report
 
 ---
 
-## ❓ 获取帮助
-
-- 📧 **邮件**: support@zhizhi.ai
-- 💬 **微信**: 扫二维码加入用户群
-- 🐛 **Issue**: [GitHub Issues](https://github.com/your-username/zhizhi/issues)
-- 📖 **文档**: 查看 CLAUDE.md 和 ENV_SETUP_GUIDE.md
-
----
-
-## 🎉 致谢
-
-感谢所有贡献者和用户的支持！
-
----
-
 **最后更新**：2026-06-19  
 **版本**：v1.0.0

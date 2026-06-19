@@ -17,7 +17,6 @@ public class KnowledgeBaseDTO {
     private Long id;
     private String name;
     private String description;
-    private String systemPrompt;
     private String status;
     private Integer documentCount;
     private Integer chunkCount;
@@ -28,7 +27,6 @@ public class KnowledgeBaseDTO {
                 .id(knowledgeBase.getId())
                 .name(knowledgeBase.getName())
                 .description(knowledgeBase.getDescription())
-                .systemPrompt(knowledgeBase.getSystemPrompt())
                 .status(knowledgeBase.getStatus())
                 .documentCount(knowledgeBase.getDocumentCount())
                 .chunkCount(knowledgeBase.getChunkCount())

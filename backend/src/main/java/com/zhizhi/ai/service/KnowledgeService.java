@@ -36,7 +36,6 @@ public class KnowledgeService {
                 .tenantId(tenantId)
                 .name(request.getName())
                 .description(request.getDescription())
-                .systemPrompt(request.getSystemPrompt())
                 .build();
         return knowledgeBaseRepository.save(kb);
     }
@@ -75,9 +74,6 @@ public class KnowledgeService {
         KnowledgeBase kb = getById(id, userId);
         kb.setName(request.getName());
         kb.setDescription(request.getDescription());
-        if (request.getSystemPrompt() != null) {
-            kb.setSystemPrompt(request.getSystemPrompt());
-        }
         return knowledgeBaseRepository.save(kb);
     }
 

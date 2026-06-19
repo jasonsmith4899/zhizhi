@@ -19,6 +19,9 @@ public class ApiKeyDTO {
     private String name;
     private String description;
     private String keyValue;
+    private String assistantPersona;
+    private String merchantBackground;
+    private String answerRules;
     private LocalDateTime createdAt;
     private Set<Long> knowledgeBaseIds;
 
@@ -28,6 +31,9 @@ public class ApiKeyDTO {
                 .name(apiKey.getName())
                 .description(apiKey.getDescription())
                 .keyValue(apiKey.getKeyValue())
+                .assistantPersona(apiKey.getAssistantPersona())
+                .merchantBackground(apiKey.getMerchantBackground())
+                .answerRules(apiKey.getAnswerRules())
                 .createdAt(apiKey.getCreatedAt())
                 .knowledgeBaseIds(apiKey.getKnowledgeBaseIds())
                 .build();

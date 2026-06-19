@@ -42,7 +42,7 @@ spring:
         index-type: HNSW
         distance-type: COSINE_DISTANCE
         dimensions: 1024
-        table-name: document_chunks
+        table-name: vector_chunks
         initialize-schema: false
 
     chat:
@@ -83,6 +83,16 @@ app:
     chunk-overlap: 100
     similarity-top-k: 5
     similarity-threshold: 0.7
+    enable-hybrid: true
+    hybrid-keyword-ratio: 0.5
+    hybrid-rff-k: 60
+    recall-min-score: 0.5
+    recall-min-chunks: 1
+    # Reranker 配置
+    reranker:
+      enabled: true
+      model: BAAI/bge-reranker-v2-m3
+      base-url: https://api.siliconflow.cn
 
   quota:
     free:

@@ -2,7 +2,8 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { ElMessage } from 'element-plus'
-import { getKnowledgeBases, getDocumentPreview } from '../../api/knowledge'
+import { getDocumentPreview } from '../../api/knowledge'
+import { listApiKeys } from '../../api/apiKey'
 import { useChatStore } from '../../stores/chat'
 import { useChatStream } from '../../composables/useChatStream'
 import ChatHeader from '../../components/chat/ChatHeader.vue'
@@ -11,10 +12,10 @@ import ChatInput from '../../components/chat/ChatInput.vue'
 import SourcePreview from '../../components/chat/SourcePreview.vue'
 
 const chatStore = useChatStore()
-const { selectedKbId } = storeToRefs(chatStore)
+const { selectedApiKeyId } = storeToRefs(chatStore)
 const { messages, loading, send, abort } = useChatStream()
 
-const knowledgeBases = ref<any[]>([])
+const apiKeys = ref<any[]>([])
 const chatInputRef = ref<InstanceType<typeof ChatInput> | null>(null)
 
 // 文档预览
@@ -24,8 +25,8 @@ const previewData = ref<any>(null)
 
 onMounted(async () => {
   try {
-    const res = await getKnowledgeBases()
-    knowledgeBases.value = (res as any).data || []
+    const res = await listApiKeys()
+    apiKeys.value = (res as any).data || []
   } catch {}
 })
 
@@ -34,8 +35,8 @@ onUnmounted(() => {
 })
 
 function handleSend(text: string) {
-  if (!selectedKbId.value) {
-    ElMessage.warning('请先选择知识库')
+  if (!selectedApiKeyId.value) {
+    ElMessage.warning('请先选择 API Key')
     return
   }
   send(text)
@@ -64,9 +65,9 @@ async function openPreview(docId: number) {
 <template>
   <div class="chat-page">
     <ChatHeader
-      :knowledge-bases="knowledgeBases"
-      :selected-kb-id="selectedKbId"
-      @update:selected-kb-id="selectedKbId = $event"
+      :api-keys="apiKeys"
+      :selected-api-key-id="selectedApiKeyId"
+      @update:selected-api-key-id="selectedApiKeyId = $event"
       @new-chat="newChat"
     />
     <MessageList
@@ -91,7 +92,38 @@ async function openPreview(docId: number) {
 .chat-page {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 120px);
-  background: #fff;
+  height: calc(100vh - var(--header-height));
+  background: var(--bg-dark);
+  position: relative;
+  overflow: hidden;
+}
+
+.chat-page::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(0, 102, 255, 0.05) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, rgba(0, 212, 255, 0.03) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.chat-page::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image:
+    linear-gradient(rgba(0, 102, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 102, 255, 0.02) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
 }
 </style>

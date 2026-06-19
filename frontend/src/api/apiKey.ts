@@ -5,11 +5,25 @@ export function listApiKeys() {
   return request.get('/api-keys')
 }
 
-export function createApiKey(data: { name?: string; description?: string; knowledgeBaseIds?: number[] }) {
+export function createApiKey(data: {
+  name?: string
+  description?: string
+  assistantPersona?: string
+  merchantBackground?: string
+  answerRules?: string
+  knowledgeBaseIds?: number[]
+}) {
   return request.post('/api-keys', data)
 }
 
-export function updateApiKey(id: number, data: { name?: string; description?: string; knowledgeBaseIds?: number[] }) {
+export function updateApiKey(id: number, data: {
+  name?: string
+  description?: string
+  assistantPersona?: string
+  merchantBackground?: string
+  answerRules?: string
+  knowledgeBaseIds?: number[]
+}) {
   return request.put(`/api-keys/${id}`, data)
 }
 

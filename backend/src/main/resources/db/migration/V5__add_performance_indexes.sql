@@ -10,5 +10,9 @@ CREATE INDEX IF NOT EXISTS idx_message_tenant_conversation ON messages(tenant_id
 -- 文档表：按租户+知识库+时间排序
 CREATE INDEX IF NOT EXISTS idx_document_tenant_kb ON documents(tenant_id, knowledge_base_id, created_at DESC);
 
--- 向量表：按租户过滤（用于相似度搜索时的预过滤）
-CREATE INDEX IF NOT EXISTS idx_document_chunk_tenant ON document_chunks((metadata->>'tenant_id'));
+-- document_chunks 表加 tenant_id（用于租户隔离查询）
+ALTER TABLE document_chunks ADD COLUMN IF NOT EXISTS tenant_id BIGINT REFERENCES tenants(id);
+UPDATE document_chunks dc SET tenant_id = (
+    SELECT d.tenant_id FROM documents d WHERE d.id = dc.document_id
+) WHERE dc.tenant_id IS NULL;
+CREATE INDEX IF NOT EXISTS idx_chunk_tenant_id ON document_chunks(tenant_id);

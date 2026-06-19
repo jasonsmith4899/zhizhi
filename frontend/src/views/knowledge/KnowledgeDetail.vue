@@ -6,7 +6,7 @@ import {
   getDocuments,
   uploadDocument,
   deleteDocument,
-  updateKnowledgeBase,
+
   getVectorStatus,
   reVectorize,
   batchDeleteDocuments,
@@ -14,6 +14,7 @@ import {
   getDocumentDownloadUrl
 } from '../../api/knowledge'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { renderMarkdown } from '../../utils/markdown'
 import { ArrowLeft, WarningFilled, Upload, Download } from '@element-plus/icons-vue'
 
 const route = useRoute()
@@ -44,69 +45,6 @@ const reVectorizeLoading = ref<Record<number, boolean>>({})
 const selectedDocuments = ref<any[]>([])
 const batchDeleting = ref(false)
 
-// 系统提示词
-const systemPrompt = ref('')
-const savingPrompt = ref(false)
-const selectedPreset = ref('default')
-
-const promptPresets = [
-  {
-    key: 'default',
-    label: '默认',
-    prompt: `你是「智知」AI知识库助手。请遵循以下规则：
-1. 根据知识库中的参考信息回答用户问题
-2. 如果参考信息中没有相关内容，请诚实说明"知识库中暂无相关信息"
-3. 回答要准确、简洁、专业
-4. 在回答末尾可以标注信息来源
-5. 不要编造不确定的信息`,
-  },
-  {
-    key: 'customer-service',
-    label: '客服专家',
-    prompt: `你是一位专业的客服专家，代表公司与客户沟通。请遵循以下原则：
-1. 始终保持礼貌、耐心、友善的态度
-2. 以解决客户问题为首要目标
-3. 先理解客户需求，再提供解决方案
-4. 如果知识库中有相关信息，优先使用；如果没有，请引导客户联系人工客服
-5. 回答要有条理，必要时分步骤说明
-6. 适当表达同理心，让客户感受到被重视`,
-  },
-  {
-    key: 'product-advisor',
-    label: '产品顾问',
-    prompt: `你是一位专业的产品顾问，帮助用户全面了解产品。请遵循以下原则：
-1. 基于知识库中的产品信息，专业、详细地介绍产品特点和优势
-2. 主动引导用户了解产品的核心价值和使用场景
-3. 针对用户需求，推荐最合适的产品功能或方案
-4. 客观对比不同选项，帮助用户做出明智决策
-5. 回答要有深度，适当引用数据和案例
-6. 如果知识库中没有相关信息，诚实告知并建议用户咨询销售团队`,
-  },
-  {
-    key: 'tutor',
-    label: '教育导师',
-    prompt: `你是一位循循善诱的教育导师，致力于帮助用户学习和理解知识。请遵循以下原则：
-1. 用通俗易懂的语言解释复杂概念
-2. 善于使用类比和举例来帮助理解
-3. 循序渐进，从基础到深入
-4. 鼓励用户提问，对每一个问题都给予积极回应
-5. 在回答后可以提出引导性问题，促进用户深入思考
-6. 基于知识库内容回答，确保信息准确可靠`,
-  },
-  {
-    key: 'concise',
-    label: '简洁回答',
-    prompt: `你是一个简洁高效的AI助手。请遵循以下原则：
-1. 直接回答问题，不绕弯子
-2. 答案尽量简短精准，控制在3-5句话以内
-3. 只提供最关键的信息，省略背景和铺垫
-4. 如果知识库中没有相关信息，直接说"暂无相关信息"
-5. 不使用寒暄和客套话`,
-  },
-]
-
-const defaultPrompt = promptPresets[0].prompt
-
 onMounted(() => {
   loadKb()
   loadDocuments()
@@ -116,10 +54,6 @@ async function loadKb() {
   try {
     const res = await getKnowledgeBase(kbId)
     kb.value = (res as any).data
-    systemPrompt.value = kb.value?.systemPrompt || ''
-    // 检测当前提示词是否匹配某个预设
-    const matched = promptPresets.find((p) => p.prompt === systemPrompt.value)
-    selectedPreset.value = matched?.key || 'default'
   } catch {
     ElMessage.error('知识库不存在')
     router.push('/knowledge')
@@ -266,38 +200,6 @@ async function handleBatchDelete() {
   }
 }
 
-// 保存系统提示词
-async function handleSavePrompt() {
-  if (!kb.value) return
-  savingPrompt.value = true
-  try {
-    await updateKnowledgeBase(kbId, {
-      name: kb.value.name,
-      description: kb.value.description,
-      systemPrompt: systemPrompt.value
-    })
-    ElMessage.success('提示词保存成功')
-    loadKb()
-  } catch {
-    ElMessage.error('保存失败')
-  } finally {
-    savingPrompt.value = false
-  }
-}
-
-function handleUseDefaultPrompt() {
-  systemPrompt.value = defaultPrompt
-  selectedPreset.value = 'default'
-}
-
-function handlePresetChange(key: string) {
-  selectedPreset.value = key
-  const preset = promptPresets.find((p) => p.key === key)
-  if (preset) {
-    systemPrompt.value = preset.prompt
-  }
-}
-
 function statusType(status: string) {
   const map: Record<string, string> = { ready: 'success', processing: 'warning', failed: 'danger' }
   return map[status] || 'info'
@@ -431,7 +333,6 @@ function needsReVectorize(doc: any): boolean {
               <template #default="{ row }">
                 <el-button type="primary" link @click="handlePreview(row)">预览</el-button>
                 <el-button
-                  v-if="row.status === 'failed' || (row.status === 'ready' && row.chunkCount === 0)"
                   type="warning"
                   link
                   :loading="reVectorizeLoading[row.id]"
@@ -448,49 +349,6 @@ function needsReVectorize(doc: any): boolean {
         </el-card>
       </el-tab-pane>
 
-      <!-- 提示词配置 Tab -->
-      <el-tab-pane label="提示词配置" name="prompt">
-        <el-card>
-          <template #header>
-            <div style="display: flex; justify-content: space-between; align-items: center">
-              <span style="font-weight: 600">系统提示词配置</span>
-              <el-button type="primary" size="small" @click="handleUseDefaultPrompt">恢复默认</el-button>
-            </div>
-          </template>
-
-          <el-alert type="info" :closable="false" style="margin-bottom: 16px">
-            系统提示词用于定义AI助手的行为和回答风格。修改后，AI将按照新的提示词进行回答。
-          </el-alert>
-
-          <div style="margin-bottom: 16px">
-            <div style="font-size: 14px; color: #606266; margin-bottom: 8px">预设风格：</div>
-            <el-radio-group v-model="selectedPreset" @change="handlePresetChange">
-              <el-radio-button
-                v-for="preset in promptPresets"
-                :key="preset.key"
-                :value="preset.key"
-              >
-                {{ preset.label }}
-              </el-radio-button>
-            </el-radio-group>
-          </div>
-
-          <el-input
-            v-model="systemPrompt"
-            type="textarea"
-            :rows="12"
-            placeholder="请输入系统提示词..."
-            maxlength="5000"
-            show-word-limit
-          />
-
-          <div style="margin-top: 16px; text-align: right">
-            <el-button type="primary" :loading="savingPrompt" @click="handleSavePrompt">
-              保存提示词
-            </el-button>
-          </div>
-        </el-card>
-      </el-tab-pane>
     </el-tabs>
 
     <!-- 文档预览对话框 -->
@@ -507,7 +365,7 @@ function needsReVectorize(doc: any): boolean {
             <el-tag type="info" size="small">切片数: {{ previewChunkCount }}</el-tag>
           </div>
           <el-scrollbar max-height="60vh">
-            <div class="preview-content">{{ previewContent }}</div>
+            <div class="preview-content" v-html="renderMarkdown(previewContent)"></div>
           </el-scrollbar>
         </template>
       </div>
@@ -530,12 +388,87 @@ function needsReVectorize(doc: any): boolean {
 .preview-content {
   font-size: 14px;
   line-height: 1.8;
-  color: #303133;
+  color: var(--text-primary);
   white-space: pre-wrap;
   word-break: break-word;
   padding: 16px;
-  background: #fafafa;
+  background: var(--bg-input);
   border-radius: 8px;
-  border: 1px solid #e4e7ed;
+  border: 1px solid var(--border-color);
+}
+
+/* 卡片 - 使用 Element Plus CSS 变量 API */
+:deep(.el-card) {
+  --el-card-bg-color: var(--bg-card);
+  --el-card-border-color: var(--border-color);
+  background: var(--el-card-bg-color);
+  border-color: var(--el-card-border-color);
+}
+
+/* Tabs - 使用 Element Plus CSS 变量 API */
+:deep(.el-tabs__header) {
+  background: transparent;
+}
+
+:deep(.el-tabs__nav-wrap::after) {
+  background-color: var(--border-color);
+}
+
+/* 对话框 - 使用 Element Plus CSS 变量 API */
+:deep(.el-dialog) {
+  --el-dialog-bg-color: var(--bg-card);
+  background: var(--el-dialog-bg-color);
+}
+
+/* 描述列表 - 使用 Element Plus CSS 变量 API */
+:deep(.el-descriptions) {
+  --el-descriptions-item-bordered-label-background: rgba(0, 102, 255, 0.1);
+  --el-descriptions-table-border: var(--border-color);
+}
+
+:deep(.el-descriptions__label) {
+  background: var(--el-descriptions-item-bordered-label-background);
+}
+
+:deep(.el-descriptions__content) {
+  background: var(--bg-input);
+}
+
+/* Alert - 使用 Element Plus CSS 变量 API */
+:deep(.el-alert) {
+  --el-alert-bg-color: rgba(0, 102, 255, 0.1);
+  background: var(--el-alert-bg-color);
+}
+
+/* 表格 - 使用 Element Plus CSS 变量 API */
+:deep(.el-table) {
+  --el-table-bg-color: rgba(10, 22, 40, 0.6);
+  --el-table-tr-bg-color: transparent;
+  --el-table-header-bg-color: rgba(0, 102, 255, 0.1);
+  --el-table-row-hover-bg-color: rgba(0, 102, 255, 0.12);
+  --el-table-border-color: var(--border-color);
+  --el-table-text-color: var(--text-primary);
+  --el-table-header-text-color: var(--text-secondary);
+}
+
+/* 复选框 */
+:deep(.el-checkbox__inner) {
+  background-color: var(--bg-input);
+  border-color: var(--border-color);
+}
+
+:deep(.el-checkbox__input.is-checked .el-checkbox__inner) {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+/* 上传组件 */
+:deep(.el-upload-dragger) {
+  background: var(--bg-input);
+  border-color: var(--border-color);
+}
+
+:deep(.el-upload-dragger:hover) {
+  border-color: var(--color-primary);
 }
 </style>

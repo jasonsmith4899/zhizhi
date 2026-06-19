@@ -1,6 +1,7 @@
 package com.zhizhi.ai.controller;
 
 import com.zhizhi.ai.common.AuthUtil;
+import com.zhizhi.ai.common.BusinessException;
 import com.zhizhi.ai.common.Result;
 import com.zhizhi.ai.model.dto.ApiKeyDTO;
 import com.zhizhi.ai.service.AuthService;
@@ -38,6 +39,9 @@ public class ApiKeyController {
         Long userId = authUtil.getUserId(authentication);
         String name = (String) request.getOrDefault("name", "默认Key");
         String description = (String) request.get("description");
+        String assistantPersona = (String) request.get("assistantPersona");
+        String merchantBackground = (String) request.get("merchantBackground");
+        String answerRules = (String) request.get("answerRules");
 
         @SuppressWarnings("unchecked")
         List<Number> kbIds = (List<Number>) request.get("knowledgeBaseIds");
@@ -50,12 +54,13 @@ public class ApiKeyController {
         }
 
         // 创建时返回完整 key 值（仅此一次可见）
-        ApiKeyDTO dto = authService.createApiKey(userId, name, description, knowledgeBaseIds);
+        ApiKeyDTO dto = authService.createApiKey(userId, name, description,
+                assistantPersona, merchantBackground, answerRules, knowledgeBaseIds);
         return Result.ok(dto);
     }
 
     /**
-     * 更新 API Key（名称、描述、关联知识库）
+     * 更新 API Key（名称、描述、配置、关联知识库）
      */
     @PutMapping("/{id}")
     public Result<ApiKeyDTO> update(@PathVariable Long id,
@@ -64,6 +69,9 @@ public class ApiKeyController {
         Long userId = authUtil.getUserId(authentication);
         String name = (String) request.get("name");
         String description = (String) request.get("description");
+        String assistantPersona = (String) request.get("assistantPersona");
+        String merchantBackground = (String) request.get("merchantBackground");
+        String answerRules = (String) request.get("answerRules");
 
         @SuppressWarnings("unchecked")
         List<Number> kbIds = (List<Number>) request.get("knowledgeBaseIds");
@@ -75,7 +83,8 @@ public class ApiKeyController {
             }
         }
 
-        return Result.ok(authService.updateApiKey(userId, id, name, description, knowledgeBaseIds));
+        return Result.ok(authService.updateApiKey(userId, id, name, description,
+                assistantPersona, merchantBackground, answerRules, knowledgeBaseIds));
     }
 
     /**

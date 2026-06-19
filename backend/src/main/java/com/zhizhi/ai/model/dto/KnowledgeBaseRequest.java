@@ -13,7 +13,4 @@ public class KnowledgeBaseRequest {
 
     @Size(max = 1000, message = "描述长度不能超过1000字")
     private String description;
-
-    @Size(max = 5000, message = "提示词长度不能超过5000字")
-    private String systemPrompt;
 }

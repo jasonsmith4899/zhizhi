@@ -1,8 +1,8 @@
-import { marked } from 'marked'
+import { Marked } from 'marked'
 import DOMPurify from 'dompurify'
 
 // 配置 marked：不使用 async，输出 HTML
-marked.setOptions({
+const markedInstance = new Marked({
   breaks: true,      // 换行符转 <br>
   gfm: true,         // GitHub 风格 markdown
 })
@@ -25,7 +25,7 @@ function preprocessMarkdown(text: string): string {
 export function renderMarkdown(text: string): string {
   if (!text) return ''
   const preprocessed = preprocessMarkdown(text)
-  const rawHtml = marked.parse(preprocessed) as string
+  const rawHtml = markedInstance.parse(preprocessed) as string
   return DOMPurify.sanitize(rawHtml, {
     ADD_TAGS: ['iframe'],
     ADD_ATTR: ['target'],

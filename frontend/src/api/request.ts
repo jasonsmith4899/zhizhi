@@ -32,9 +32,9 @@ let pendingRequests: Array<{
 // 响应拦截器
 request.interceptors.response.use(
   (response) => {
-    // blob 响应直接返回，不做 code 检查
+    // blob 响应直接返回 data（Blob），不做 code 检查
     if (response.config.responseType === 'blob') {
-      return response
+      return response.data
     }
     const { data } = response
     if (data.code !== 200) {

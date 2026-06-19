@@ -15,7 +15,7 @@ const MAX_PERSISTED_MESSAGES = 50
 export const useChatStore = defineStore('chat', () => {
   const messages = ref<Msg[]>([])
   const sessionId = ref<string | undefined>(undefined)
-  const selectedKbId = ref<number | undefined>(undefined)
+  const selectedApiKeyId = ref<number | undefined>(undefined)
   let skipSave = false
 
   // 从 localStorage 恢复状态
@@ -30,7 +30,8 @@ export const useChatStore = defineStore('chat', () => {
           time: new Date(m.time),
         }))
         sessionId.value = data.sessionId || undefined
-        selectedKbId.value = data.selectedKbId || undefined
+        // 兼容旧的 selectedKbId
+        selectedApiKeyId.value = data.selectedApiKeyId || data.selectedKbId || undefined
       }
     } catch (e) {
       console.error('Failed to load chat state from storage:', e)
@@ -49,7 +50,7 @@ export const useChatStore = defineStore('chat', () => {
         JSON.stringify({
           messages: messagesToSave,
           sessionId: sessionId.value,
-          selectedKbId: selectedKbId.value,
+          selectedApiKeyId: selectedApiKeyId.value,
         })
       )
     } catch (e: any) {
@@ -61,7 +62,7 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   // 监听变化自动持久化
-  watch([messages, sessionId, selectedKbId], saveToStorage, { deep: true })
+  watch([messages, sessionId, selectedApiKeyId], saveToStorage, { deep: true })
 
   // F7: 跨标签页同步
   window.addEventListener('storage', (e) => {
@@ -74,7 +75,7 @@ export const useChatStore = defineStore('chat', () => {
         time: new Date(m.time),
       }))
       sessionId.value = data.sessionId || undefined
-      selectedKbId.value = data.selectedKbId || undefined
+      selectedApiKeyId.value = data.selectedApiKeyId || data.selectedKbId || undefined
     } catch (err) {
       console.error('Failed to sync chat state across tabs:', err)
     } finally {
@@ -93,7 +94,7 @@ export const useChatStore = defineStore('chat', () => {
   return {
     messages,
     sessionId,
-    selectedKbId,
+    selectedApiKeyId,
     newChat,
   }
 })

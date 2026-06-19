@@ -15,6 +15,7 @@ export function deleteConversation(conversationId: number) {
 
 export function sendMessage(data: {
   message: string
+  apiKeyId?: number
   knowledgeBaseId?: number
   sessionId?: string
 }) {
@@ -22,7 +23,7 @@ export function sendMessage(data: {
 }
 
 export async function sendMessageStream(
-  data: { message: string; knowledgeBaseId?: number; sessionId?: string },
+  data: { message: string; apiKeyId?: number; knowledgeBaseId?: number; sessionId?: string },
   callbacks: {
     onChunk: (text: string) => void
     onSources: (sources: any[]) => void

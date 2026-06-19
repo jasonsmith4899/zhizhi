@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { getConversations, getMessages, deleteConversation } from '../../api/chat'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { renderMarkdown } from '../../utils/markdown'
 
 const loading = ref(false)
 const conversations = ref<any[]>([])
@@ -79,14 +80,8 @@ function roleType(role: string) {
             <div
               v-for="conv in conversations"
               :key="conv.id"
-              :style="{
-                padding: '12px',
-                marginBottom: '8px',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                background: selectedConv?.id === conv.id ? '#ecf5ff' : '#f5f7fa',
-                border: selectedConv?.id === conv.id ? '1px solid #409eff' : '1px solid transparent',
-              }"
+              :class="{ 'conv-item-selected': selectedConv?.id === conv.id }"
+              class="conv-item"
               @click="viewMessages(conv)"
             >
               <div style="display: flex; justify-content: space-between; align-items: center">
@@ -95,7 +90,7 @@ function roleType(role: string) {
                 </span>
                 <el-button type="danger" link size="small" @click.stop="handleDelete(conv)">删除</el-button>
               </div>
-              <div style="font-size: 12px; color: #909399; margin-top: 4px">
+              <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px">
                 {{ conv.messageCount }} 条消息 · {{ new Date(conv.updatedAt).toLocaleString('zh-CN') }}
               </div>
             </div>
@@ -114,12 +109,11 @@ function roleType(role: string) {
             <div v-for="msg in messages" :key="msg.id" style="margin-bottom: 16px">
               <div style="display: flex; align-items: center; margin-bottom: 4px">
                 <el-tag :type="roleType(msg.role)" size="small">{{ roleText(msg.role) }}</el-tag>
-                <span style="font-size: 12px; color: #909399; margin-left: 8px">
+                <span style="font-size: 12px; color: var(--text-muted); margin-left: 8px">
                   {{ new Date(msg.createdAt).toLocaleString('zh-CN') }}
                 </span>
               </div>
-              <div style="padding: 12px; border-radius: 8px; background: #f5f7fa; line-height: 1.6; white-space: pre-wrap">
-                {{ msg.content }}
+              <div class="markdown-body" style="padding: 12px; border-radius: 8px; background: var(--bg-input); line-height: 1.6" v-html="renderMarkdown(msg.content)">
               </div>
             </div>
           </div>
@@ -131,3 +125,91 @@ function roleType(role: string) {
     </el-row>
   </div>
 </template>
+
+<style scoped>
+.markdown-body :deep(h1),
+.markdown-body :deep(h2),
+.markdown-body :deep(h3) {
+  margin: 12px 0 6px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.markdown-body :deep(h1) { font-size: 18px; }
+.markdown-body :deep(h2) { font-size: 16px; }
+.markdown-body :deep(h3) { font-size: 15px; }
+.markdown-body :deep(p) {
+  margin: 6px 0;
+}
+.markdown-body :deep(ul),
+.markdown-body :deep(ol) {
+  padding-left: 20px;
+  margin: 6px 0;
+}
+.markdown-body :deep(li) {
+  margin: 3px 0;
+}
+.markdown-body :deep(code) {
+  background: rgba(0, 212, 255, 0.1);
+  padding: 2px 5px;
+  border-radius: 3px;
+  font-size: 13px;
+  font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
+  color: var(--color-neon-blue);
+}
+.markdown-body :deep(pre) {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 10px 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+.markdown-body :deep(pre code) {
+  background: none;
+  padding: 0;
+  color: var(--text-primary);
+}
+.markdown-body :deep(strong) {
+  font-weight: 600;
+}
+.markdown-body :deep(table) {
+  border-collapse: collapse;
+  margin: 8px 0;
+  width: 100%;
+}
+.markdown-body :deep(th),
+.markdown-body :deep(td) {
+  border: 1px solid var(--border-color);
+  padding: 6px 10px;
+  text-align: left;
+  font-size: 13px;
+}
+.markdown-body :deep(th) {
+  background: rgba(0, 102, 255, 0.1);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.markdown-body :deep(td) {
+  color: var(--text-primary);
+}
+
+/* 对话列表项 */
+.conv-item {
+  padding: 12px;
+  margin-bottom: 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  background: rgba(30, 58, 95, 0.2);
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.conv-item:hover {
+  background: rgba(0, 102, 255, 0.1);
+  border-color: rgba(0, 102, 255, 0.2);
+}
+
+.conv-item-selected {
+  background: rgba(0, 102, 255, 0.15) !important;
+  border-color: var(--color-primary) !important;
+}
+</style>

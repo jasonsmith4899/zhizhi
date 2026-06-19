@@ -7,7 +7,7 @@ const STREAM_TIMEOUT = 60_000
 
 export function useChatStream() {
   const chatStore = useChatStore()
-  const { messages, sessionId, selectedKbId } = storeToRefs(chatStore)
+  const { messages, sessionId, selectedApiKeyId } = storeToRefs(chatStore)
   const loading = ref(false)
   let abortController: AbortController | null = null
   let timeoutId: ReturnType<typeof setTimeout> | null = null
@@ -27,7 +27,7 @@ export function useChatStream() {
 
   async function send(text: string) {
     if (!text.trim() || loading.value) return
-    if (!selectedKbId.value) return
+    if (!selectedApiKeyId.value) return
 
     abort()
     abortController = new AbortController()
@@ -49,7 +49,7 @@ export function useChatStream() {
       await sendMessageStream(
         {
           message: text,
-          knowledgeBaseId: selectedKbId.value,
+          apiKeyId: selectedApiKeyId.value,
           sessionId: sessionId.value,
         },
         {

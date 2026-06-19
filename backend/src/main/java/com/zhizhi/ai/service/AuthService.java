@@ -142,7 +142,9 @@ public class AuthService {
      * 创建新的 API Key
      */
     @Transactional
-    public ApiKeyDTO createApiKey(Long userId, String name, String description, Set<Long> knowledgeBaseIds) {
+    public ApiKeyDTO createApiKey(Long userId, String name, String description,
+                                  String assistantPersona, String merchantBackground, String answerRules,
+                                  Set<Long> knowledgeBaseIds) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> BusinessException.notFound("用户"));
 
@@ -154,21 +156,19 @@ public class AuthService {
                 .keyValue(keyValue)
                 .name(name != null ? name : "默认Key")
                 .description(description)
+                .assistantPersona(assistantPersona)
+                .merchantBackground(merchantBackground)
+                .answerRules(answerRules)
                 .build();
 
-        // 关联知识库（必须至少一个）
-        if (knowledgeBaseIds == null || knowledgeBaseIds.isEmpty()) {
-            throw new BusinessException("必须至少关联一个知识库");
+        // 关联知识库
+        if (knowledgeBaseIds != null && !knowledgeBaseIds.isEmpty()) {
+            List<KnowledgeBase> kbs = knowledgeBaseRepository.findAllById(knowledgeBaseIds);
+            Set<KnowledgeBase> validKbs = kbs.stream()
+                    .filter(kb -> kb.getUserId().equals(userId))
+                    .collect(Collectors.toSet());
+            apiKey.setKnowledgeBases(new HashSet<>(validKbs));
         }
-        List<KnowledgeBase> kbs = knowledgeBaseRepository.findAllById(knowledgeBaseIds);
-        // 校验知识库属于该用户
-        Set<KnowledgeBase> validKbs = kbs.stream()
-                .filter(kb -> kb.getUserId().equals(userId))
-                .collect(Collectors.toSet());
-        if (validKbs.isEmpty()) {
-            throw new BusinessException("所选知识库无效");
-        }
-        apiKey.setKnowledgeBases(new HashSet<>(validKbs));
 
         apiKeyRepository.save(apiKey);
         log.info("用户 {} 创建了新的 API Key: {}", user.getUsername(), name);
@@ -181,7 +181,9 @@ public class AuthService {
      * 更新 API Key（名称、描述、关联知识库）
      */
     @Transactional
-    public ApiKeyDTO updateApiKey(Long userId, Long apiKeyId, String name, String description, Set<Long> knowledgeBaseIds) {
+    public ApiKeyDTO updateApiKey(Long userId, Long apiKeyId, String name, String description,
+                                   String assistantPersona, String merchantBackground, String answerRules,
+                                   Set<Long> knowledgeBaseIds) {
         ApiKey apiKey = apiKeyRepository.findById(apiKeyId)
                 .orElseThrow(() -> BusinessException.notFound("API Key"));
 
@@ -191,6 +193,9 @@ public class AuthService {
 
         if (name != null) apiKey.setName(name);
         if (description != null) apiKey.setDescription(description);
+        apiKey.setAssistantPersona(assistantPersona);
+        apiKey.setMerchantBackground(merchantBackground);
+        apiKey.setAnswerRules(answerRules);
 
         // 更新关联知识库
         if (knowledgeBaseIds != null) {

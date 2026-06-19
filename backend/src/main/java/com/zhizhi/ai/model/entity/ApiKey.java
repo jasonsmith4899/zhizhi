@@ -37,6 +37,15 @@ public class ApiKey {
     @Column(length = 500)
     private String description;
 
+    @Column(name = "assistant_persona", columnDefinition = "TEXT")
+    private String assistantPersona;
+
+    @Column(name = "merchant_background", columnDefinition = "TEXT")
+    private String merchantBackground;
+
+    @Column(name = "answer_rules", columnDefinition = "TEXT")
+    private String answerRules;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 

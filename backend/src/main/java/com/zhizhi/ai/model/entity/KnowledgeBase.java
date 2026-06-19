@@ -34,9 +34,6 @@ public class KnowledgeBase {
     @Column(length = 1000)
     private String description;
 
-    @Column(name = "system_prompt", columnDefinition = "TEXT")
-    private String systemPrompt;
-
     @Column(length = 50)
     @Builder.Default
     private String status = "active";  // active / archived

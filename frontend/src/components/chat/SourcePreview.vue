@@ -28,7 +28,7 @@ defineEmits<{
         <pre class="preview-text">{{ previewData.content }}</pre>
       </el-scrollbar>
     </div>
-    <div v-else style="text-align: center; color: #909399; padding: 40px 0">
+    <div v-else style="text-align: center; color: var(--text-muted); padding: 40px 0">
       无法加载文档内容
     </div>
   </el-dialog>
@@ -41,7 +41,7 @@ defineEmits<{
 .preview-meta {
   display: flex;
   gap: 20px;
-  color: #909399;
+  color: var(--text-secondary);
   font-size: 13px;
   margin-bottom: 12px;
 }
@@ -50,10 +50,11 @@ defineEmits<{
   white-space: pre-wrap;
   word-break: break-word;
   line-height: 1.8;
-  color: #303133;
+  color: var(--text-primary);
   margin: 0;
   padding: 12px;
-  background: #fafafa;
+  background: var(--bg-input);
   border-radius: 6px;
+  border: 1px solid var(--border-color);
 }
 </style>

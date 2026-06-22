@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>智知 ZhiZhi · UI 设计规范预览（深空蓝主题）</title>
+<style>
+/* ============================================================
+   设计 Token —— 与 frontend/src/styles/global.css 保持同步
+   ============================================================ */
+:root {
+  --color-primary: #0066FF;
+  --color-primary-light: #3388FF;
+  --color-primary-dark: #0044CC;
+  --color-neon-blue: #00D4FF;
+  --color-neon-blue-glow: rgba(0, 212, 255, 0.4);
+  --color-deep-space: #0A1628;
+  --color-stellar-blue: #1E3A5F;
+  --color-cosmic-purple: #7B61FF;
+  /* 语义色（已在 global.css 正式 token 化：主色 + -light/-dark + -bg/-border） */
+  --color-success: #00ff88;
+  --color-danger: #ff4757;
+  --color-warning: #ffa500;
+  --color-info: #7b61ff;
+  --bg-dark: #0B0E14;
+  --bg-card: rgba(15, 23, 42, 0.85);
+  --bg-sidebar: rgba(10, 22, 40, 0.95);
+  --bg-input: rgba(30, 58, 95, 0.3);
+  --text-primary: #E8F4FD;
+  --text-secondary: rgba(232, 244, 253, 0.7);
+  --text-muted: rgba(232, 244, 253, 0.4);
+  --border-color: rgba(0, 102, 255, 0.2);
+  --border-glow: rgba(0, 212, 255, 0.3);
+  --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.3);
+  --shadow-glow: 0 0 20px rgba(0, 102, 255, 0.15), 0 0 60px rgba(0, 212, 255, 0.1);
+  --shadow-neon: 0 0 10px var(--color-neon-blue-glow), 0 0 40px rgba(0, 212, 255, 0.2);
+  --sidebar-width: 240px;
+  --header-height: 64px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Exo 2', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background-color: var(--bg-dark);
+  color: var(--text-primary);
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+/* 星空背景 */
+body::before {
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: -1;
+  background:
+    radial-gradient(ellipse at 20% 50%, rgba(0, 102, 255, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, rgba(123, 97, 255, 0.06) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 80%, rgba(0, 212, 255, 0.05) 0%, transparent 50%);
+}
+/* 科技网格 */
+body::after {
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: -1;
+  background-image:
+    linear-gradient(rgba(0, 102, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 102, 255, 0.03) 1px, transparent 1px);
+  background-size: 50px 50px;
+}
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); }
+::-webkit-scrollbar-thumb { background: var(--color-stellar-blue); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-primary); }
+::selection { background: var(--color-primary); color: #fff; }
+
+/* ============================================================
+   展示页布局
+   ============================================================ */
+.wrap { max-width: 1180px; margin: 0 auto; padding: 48px 28px 96px; }
+.hero { text-align: center; margin-bottom: 56px; }
+.hero h1 {
+  font-family: 'Orbitron', monospace; font-size: 44px; font-weight: 800; letter-spacing: 3px;
+  background: linear-gradient(135deg, var(--text-primary) 0%, var(--color-neon-blue) 100%);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+}
+.hero p { color: var(--text-secondary); font-family: 'Rajdhani', sans-serif; letter-spacing: 1px; margin-top: 8px; }
+.hero .badge {
+  display: inline-block; margin-top: 16px; padding: 4px 14px; font-family: 'Rajdhani', sans-serif;
+  font-size: 13px; color: var(--color-neon-blue); background: rgba(0, 212, 255, 0.08);
+  border: 1px solid var(--border-glow); border-radius: 20px;
+}
+section { margin-bottom: 56px; }
+.sec-title {
+  font-family: 'Rajdhani', sans-serif; font-size: 24px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 1.5px; color: var(--text-primary); margin-bottom: 6px;
+  display: flex; align-items: center; gap: 12px;
+}
+.sec-title::before { content: ''; width: 4px; height: 24px; border-radius: 2px; background: linear-gradient(180deg, var(--color-primary), var(--color-neon-blue)); }
+.sec-desc { color: var(--text-muted); font-size: 13px; margin: 0 0 22px 16px; }
+.panel {
+  background: var(--bg-card); backdrop-filter: blur(20px); border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow-card); padding: 28px;
+}
+.row { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; }
+.grid { display: grid; gap: 16px; }
+.label-sm { font-family: 'Rajdhani', sans-serif; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); margin-bottom: 10px; }
+
+/* 色板 */
+.swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; }
+.swatch { border-radius: var(--radius-md); border: 1px solid var(--border-color); overflow: hidden; background: rgba(0,0,0,.15); }
+.swatch .chip { height: 72px; }
+.swatch .meta { padding: 10px 12px; }
+.swatch .name { font-family: 'Rajdhani', sans-serif; font-weight: 600; font-size: 13px; }
+.swatch .val { font-family: 'Orbitron', monospace; font-size: 11px; color: var(--text-muted); margin-top: 2px; word-break: break-all; }
+
+/* 字体样例 */
+.font-demo { padding: 16px 0; border-bottom: 1px solid var(--border-color); }
+.font-demo:last-child { border-bottom: none; }
+.font-orbitron { font-family: 'Orbitron', monospace; }
+.font-rajdhani { font-family: 'Rajdhani', sans-serif; }
+.font-exo { font-family: 'Exo 2', sans-serif; }
+
+/* 圆角/阴影方块 */
+.box-demo { width: 110px; height: 88px; background: var(--bg-input); border: 1px solid var(--border-color); display: flex; align-items: flex-end; justify-content: center; padding: 8px; }
+.box-demo span { font-family: 'Orbitron', monospace; font-size: 11px; color: var(--text-muted); }
+
+/* ============================================================
+   Element Plus 主题覆盖（节选自 global.css，用于真实还原）
+   ============================================================ */
+.el-button {
+  display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+  padding: 9px 18px; border-radius: var(--radius-md); font-size: 14px;
+  font-family: 'Rajdhani', sans-serif; font-weight: 600; letter-spacing: 0.5px;
+  transition: all var(--transition-normal); border: 1px solid var(--border-color);
+}
+.el-button--default { background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-primary); }
+.el-button--default:hover { background: rgba(0, 102, 255, 0.1); border-color: var(--color-primary); color: var(--color-primary-light); }
+.el-button--primary { background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%); border: none; color: #fff; }
+.el-button--primary:hover { background: linear-gradient(135deg, var(--color-primary-light) 0%, var(--color-primary) 100%); box-shadow: 0 0 20px rgba(0, 102, 255, 0.4); transform: translateY(-1px); }
+.el-button--success { background: linear-gradient(135deg, #00ff88 0%, #00cc6a 100%); border: none; color: #0B0E14; }
+.el-button--success:hover { background: linear-gradient(135deg, #33ff9f 0%, #00ff88 100%); }
+.el-button--warning { background: linear-gradient(135deg, #ffa500 0%, #ff8c00 100%); border: none; color: #fff; }
+.el-button--danger { background: linear-gradient(135deg, #ff4757 0%, #ff6b81 100%); border: none; color: #fff; }
+.el-button--info { background: linear-gradient(135deg, #7b61ff 0%, #6a5acd 100%); border: none; color: #fff; }
+.el-button--primary.is-plain { background: rgba(0, 102, 255, 0.1); border: 1px solid var(--color-primary); color: var(--color-primary-light); }
+.el-button--primary.is-plain:hover { background: var(--color-primary); color: #fff; }
+.el-button--danger.is-plain { background: rgba(255, 71, 87, 0.1); border: 1px solid #ff4757; color: #ff4757; }
+.el-button--danger.is-plain:hover { background: #ff4757; color: #fff; }
+
+.el-tag {
+  display: inline-flex; align-items: center; padding: 4px 12px; font-size: 12px;
+  font-family: 'Rajdhani', sans-serif; font-weight: 600; border-radius: 6px; border: 1px solid;
+}
+.el-tag--success { background: rgba(0, 255, 136, 0.1); border-color: rgba(0, 255, 136, 0.3); color: #00ff88; }
+.el-tag--info { background: rgba(123, 97, 255, 0.1); border-color: rgba(123, 97, 255, 0.3); color: #7b61ff; }
+.el-tag--warning { background: rgba(255, 165, 0, 0.1); border-color: rgba(255, 165, 0, 0.3); color: #ffa500; }
+.el-tag--danger { background: rgba(255, 71, 87, 0.1); border-color: rgba(255, 71, 87, 0.3); color: #ff4757; }
+
+.el-input { display: inline-block; width: 260px; }
+.el-input__wrapper {
+  display: flex; align-items: center; padding: 8px 12px; background: var(--bg-input);
+  border: 1px solid var(--border-color); border-radius: var(--radius-md); transition: all var(--transition-normal);
+}
+.el-input__wrapper:hover { border-color: var(--color-primary); }
+.el-input__wrapper.is-focus { border-color: var(--color-neon-blue); box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.1); }
+.el-input__inner { flex: 1; background: transparent; border: none; outline: none; color: var(--text-primary); font-family: inherit; font-size: 14px; }
+.el-input__inner::placeholder { color: var(--text-muted); }
+.el-textarea__inner {
+  width: 100%; min-height: 84px; resize: vertical; padding: 10px 12px; background: var(--bg-input);
+  color: var(--text-primary); border: 1px solid var(--border-color); border-radius: var(--radius-md);
+  font-family: inherit; font-size: 14px; outline: none;
+}
+.el-textarea__inner:focus { border-color: var(--color-neon-blue); box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.1); }
+.is-disabled .el-input__wrapper { background: rgba(30, 58, 95, 0.15); }
+.is-disabled .el-input__inner { color: var(--text-muted); }
+
+/* 开关 */
+.el-switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.el-switch__core { width: 40px; height: 20px; border-radius: 10px; background: var(--bg-input); border: 1px solid var(--border-color); position: relative; transition: all var(--transition-normal); }
+.el-switch__core::after { content: ''; position: absolute; top: 1px; left: 1px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: all var(--transition-normal); }
+.el-switch.is-checked .el-switch__core { background: var(--color-primary); border-color: var(--color-primary); }
+.el-switch.is-checked .el-switch__core::after { left: 21px; }
+
+/* 复选 / 单选 */
+.el-checkbox, .el-radio { display: inline-flex; align-items: center; gap: 8px; color: var(--text-primary); cursor: pointer; font-size: 14px; }
+.el-checkbox__inner { width: 16px; height: 16px; border-radius: 3px; background: var(--bg-input); border: 1px solid var(--border-color); }
+.el-radio__inner { width: 16px; height: 16px; border-radius: 50%; background: var(--bg-input); border: 1px solid var(--border-color); }
+.is-checked .el-checkbox__inner, .is-checked .el-radio__inner { background: var(--color-primary); border-color: var(--color-primary); }
+
+/* el-card */
+.el-card { background: var(--bg-card); backdrop-filter: blur(20px); border: 1px solid var(--border-color); border-radius: var(--radius-lg); box-shadow: var(--shadow-card); color: var(--text-primary); overflow: hidden; }
+.el-card__header { padding: 16px 20px; border-bottom: 1px solid var(--border-color); font-family: 'Rajdhani', sans-serif; font-weight: 600; }
+.el-card__body { padding: 20px; color: var(--text-secondary); }
+
+/* Alert */
+.el-alert { display: flex; gap: 10px; padding: 12px 16px; border-radius: var(--radius-md); margin-bottom: 12px; background: rgba(0, 102, 255, 0.1); border: 1px solid rgba(0, 102, 255, 0.25); }
+.el-alert__icon { color: var(--color-neon-blue); }
+.el-alert__title { color: var(--text-primary); font-weight: 600; font-family: 'Rajdhani', sans-serif; }
+.el-alert__desc { color: var(--text-secondary); font-size: 13px; }
+.el-alert--success { background: rgba(0,255,136,.08); border-color: rgba(0,255,136,.3); }
+.el-alert--success .el-alert__icon { color: var(--color-success); }
+.el-alert--warning { background: rgba(255,165,0,.08); border-color: rgba(255,165,0,.3); }
+.el-alert--warning .el-alert__icon { color: var(--color-warning); }
+.el-alert--danger { background: rgba(255,71,87,.08); border-color: rgba(255,71,87,.3); }
+.el-alert--danger .el-alert__icon { color: var(--color-danger); }
+
+/* 表格 */
+.el-table { width: 100%; border-collapse: collapse; background: rgba(10, 22, 40, 0.6); border-radius: var(--radius-md); overflow: hidden; }
+.el-table th { background: rgba(0, 102, 255, 0.1); color: var(--text-secondary); font-family: 'Rajdhani', sans-serif; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; padding: 12px 14px; text-align: left; font-size: 13px; border-bottom: 1px solid var(--border-color); }
+.el-table td { padding: 12px 14px; color: var(--text-primary); border-bottom: 1px solid rgba(0, 102, 255, 0.05); font-size: 14px; }
+.el-table tr:hover td { background: rgba(0, 102, 255, 0.08); }
+
+/* 进度条 */
+.el-progress { display: flex; align-items: center; gap: 12px; }
+.el-progress-bar__outer { flex: 1; height: 8px; background: var(--bg-input); border-radius: 4px; overflow: hidden; }
+.el-progress-bar__inner { height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--color-primary), var(--color-neon-blue)); }
+.el-progress__text { font-family: 'Orbitron', monospace; font-size: 13px; color: var(--text-primary); }
+
+/* 菜单项 */
+.el-menu { background: transparent; width: 240px; }
+.el-menu-item { display: flex; align-items: center; gap: 12px; padding: 12px 18px; color: var(--text-secondary); border-radius: var(--radius-md); cursor: pointer; transition: all var(--transition-normal); position: relative; font-family: 'Rajdhani', sans-serif; font-weight: 500; }
+.el-menu-item:hover { background: rgba(0, 102, 255, 0.1); color: var(--text-primary); }
+.el-menu-item.is-active { color: var(--color-neon-blue); background: rgba(0, 212, 255, 0.08); }
+.el-menu-item.is-active::before { content: ''; position: absolute; left: 0; top: 20%; bottom: 20%; width: 3px; border-radius: 2px; background: linear-gradient(180deg, var(--color-primary), var(--color-neon-blue)); box-shadow: 0 0 10px var(--color-neon-blue-glow); }
+
+/* 对话框（静态） */
+.el-dialog { width: 460px; background: var(--bg-card); backdrop-filter: blur(20px); border: 1px solid var(--border-color); border-radius: var(--radius-xl); overflow: hidden; }
+.el-dialog__header { padding: 20px 24px; border-bottom: 1px solid var(--border-color); }
+.el-dialog__title { color: var(--text-primary); font-family: 'Rajdhani', sans-serif; font-weight: 600; font-size: 17px; }
+.el-dialog__body { padding: 24px; color: var(--text-secondary); }
+.el-dialog__footer { padding: 16px 24px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 12px; }
+
+/* ============================================================
+   业务组件还原
+   ============================================================ */
+/* 统计卡 */
+.stat-card { padding: 24px; border-radius: var(--radius-lg); background: var(--bg-card); backdrop-filter: blur(20px); border: 1px solid var(--border-color); box-shadow: var(--shadow-card); transition: all var(--transition-normal); position: relative; overflow: hidden; }
+.stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, var(--color-primary), var(--color-neon-blue)); opacity: 0; transition: opacity var(--transition-normal); }
+.stat-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-neon); border-color: var(--border-glow); }
+.stat-card:hover::before { opacity: 1; }
+.stat-card .label { font-family: 'Rajdhani', sans-serif; font-size: 14px; font-weight: 500; color: var(--text-secondary); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+.stat-card .value { font-family: 'Orbitron', monospace; font-size: 36px; font-weight: 700; color: var(--text-primary); text-shadow: 0 0 20px var(--color-neon-blue-glow); }
+
+/* 渐变图标方块 */
+.icon-square { position: relative; width: 48px; height: 48px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 22px; color: #fff; background: linear-gradient(135deg, var(--color-primary), var(--color-neon-blue)); }
+.icon-square .icon-glow { position: absolute; inset: -6px; border-radius: 18px; background: radial-gradient(circle, var(--color-neon-blue-glow) 0%, transparent 70%); opacity: .6; }
+
+/* 状态徽章 + 点 */
+.status-badge { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 20px; font-family: 'Rajdhani', sans-serif; font-size: 12px; font-weight: 600; }
+.status-badge.active { background: rgba(0,255,136,.1); color: #00ff88; border: 1px solid rgba(0,255,136,.3); }
+.status-badge.archived { background: rgba(123,97,255,.1); color: #7b61ff; border: 1px solid rgba(123,97,255,.3); }
+.status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; box-shadow: 0 0 8px currentColor; }
+.status-dot.blink { animation: blink 2s ease-in-out infinite; }
+
+/* 六边形 */
+.hexagon { width: 88px; height: 88px; clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); background: linear-gradient(135deg, var(--color-primary), var(--color-neon-blue)); display: flex; align-items: center; justify-content: center; font-size: 30px; color: #fff; }
+.hexagon.float { animation: float 6s ease-in-out infinite; }
+
+/* 消息气泡 */
+.msg-row { display: flex; gap: 16px; margin-bottom: 18px; }
+.msg-row.user { flex-direction: row-reverse; }
+.avatar { position: relative; width: 44px; height: 44px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-family: 'Rajdhani', sans-serif; font-weight: 700; color: #fff; flex-shrink: 0; text-shadow: 0 0 10px rgba(255,255,255,.5); }
+.avatar.ai { background: linear-gradient(135deg, var(--color-primary), var(--color-neon-blue)); }
+.avatar.user { background: linear-gradient(135deg, var(--color-cosmic-purple), var(--color-primary)); }
+.avatar .glow { position: absolute; inset: -6px; border-radius: 18px; background: radial-gradient(circle, var(--color-neon-blue-glow) 0%, transparent 70%); animation: pulse-glow 3s ease-in-out infinite; }
+.bubble { max-width: 70%; padding: 16px 20px; border-radius: 16px; font-size: 14px; line-height: 1.7; position: relative; }
+.bubble.ai { background: var(--bg-card); backdrop-filter: blur(20px); border: 1px solid var(--border-color); border-bottom-left-radius: 4px; overflow: hidden; animation: fade-in-up .3s ease-out; }
+.bubble.ai::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, var(--color-primary), var(--color-neon-blue)); }
+.bubble.user { background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark)); color: #fff; border-bottom-right-radius: 4px; box-shadow: 0 4px 20px rgba(0,102,255,.3); }
+/* 输入中三点 */
+.typing { display: inline-flex; gap: 6px; padding: 6px 0; }
+.typing span { width: 8px; height: 8px; border-radius: 50%; background: var(--color-neon-blue); animation: bounce 1.4s infinite ease-in-out; }
+.typing span:nth-child(2) { animation-delay: .2s; }
+.typing span:nth-child(3) { animation-delay: .4s; }
+.cursor { display: inline-block; width: 8px; height: 16px; background: var(--color-neon-blue); vertical-align: text-bottom; animation: cursor-blink .8s infinite; }
+/* 来源引用 */
+.references { margin-top: 14px; }
+.ref-item { position: relative; counter-increment: ref; padding: 10px 10px 10px 40px; margin-top: 8px; background: rgba(0,102,255,.03); border-left: 3px solid var(--color-primary); border-radius: 0 8px 8px 0; transition: all var(--transition-normal); }
+.ref-item:hover { background: rgba(0,102,255,.08); transform: translateX(4px); }
+.ref-item::before { content: counter(ref); position: absolute; left: 10px; top: 10px; width: 22px; height: 22px; border-radius: 6px; background: linear-gradient(135deg, var(--color-primary), var(--color-neon-blue)); color: #fff; font-family: 'Orbitron', monospace; font-size: 11px; display: flex; align-items: center; justify-content: center; }
+.ref-name { font-family: 'Rajdhani', sans-serif; font-weight: 600; font-size: 13px; }
+.ref-score { font-family: 'Orbitron', monospace; font-size: 11px; }
+.score-high { color: #00ff88; } .score-mid { color: #00d4ff; } .score-low { color: #7b61ff; }
+.references { counter-reset: ref; }
+
+/* 扫光按钮 */
+.shine-btn { position: relative; overflow: hidden; padding: 12px 28px; border: none; border-radius: var(--radius-md); cursor: pointer; color: #fff; font-family: 'Rajdhani', sans-serif; font-weight: 600; letter-spacing: .5px; background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark)); }
+.shine-btn::after { content: ''; position: absolute; top: 0; left: -120%; width: 80%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,.2), transparent); transform: skewX(-20deg); animation: shine 2.4s infinite; }
+
+/* 空状态 */
+.empty { text-align: center; padding: 32px; }
+.empty .hex-wrap { position: relative; width: 120px; height: 120px; margin: 0 auto 24px; }
+.empty .icon-glow { position: absolute; inset: -20px; border-radius: 50%; background: radial-gradient(circle, var(--color-neon-blue-glow) 0%, transparent 70%); animation: pulse-glow 3s ease-in-out infinite; }
+.empty .hexagon { animation: float 6s ease-in-out infinite; }
+.empty .empty-title { font-family: 'Rajdhani', sans-serif; font-size: 22px; font-weight: 600; margin-bottom: 8px; }
+.empty .empty-subtitle { color: var(--text-secondary); font-size: 14px; }
+
+/* 工具类 */
+.glow-text { text-shadow: 0 0 10px var(--color-neon-blue-glow); }
+.glow-border { box-shadow: 0 0 10px var(--color-neon-blue-glow), inset 0 0 10px rgba(0, 212, 255, 0.05); }
+.glass-effect { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(20px); border: 1px solid rgba(0, 102, 255, 0.15); }
+.gradient-text { background: linear-gradient(135deg, var(--text-primary) 0%, var(--color-neon-blue) 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+.util-box { padding: 18px 22px; border-radius: var(--radius-md); font-family: 'Rajdhani', sans-serif; font-weight: 600; }
+
+/* ============================================================
+   动画关键帧
+   ============================================================ */
+@keyframes pulse-glow { 0%,100% { box-shadow: 0 0 5px var(--color-neon-blue-glow); } 50% { box-shadow: 0 0 20px var(--color-neon-blue-glow), 0 0 40px rgba(0,212,255,.1); } }
+@keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+@keyframes fade-in-up { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes slide-in-left { from { transform: translateX(-100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes slide-in-right { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+@keyframes bounce { 0%,60%,100% { transform: translateY(0); } 30% { transform: translateY(-8px); } }
+@keyframes cursor-blink { 0%,100% { opacity: 1; } 50% { opacity: 0; } }
+@keyframes shine { 0% { left: -120%; } 60%,100% { left: 120%; } }
+
+/* 动画演示盒 */
+.anim-demo { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.anim-demo .stage { width: 64px; height: 64px; border-radius: var(--radius-md); background: linear-gradient(135deg, var(--color-primary), var(--color-neon-blue)); }
+.anim-demo .name { font-family: 'Orbitron', monospace; font-size: 11px; color: var(--text-muted); }
+.demo-pulse { animation: pulse-glow 2.5s ease-in-out infinite; }
+.demo-float { animation: float 3s ease-in-out infinite; }
+.demo-fade { animation: fade-in-up 2s ease-in-out infinite; }
+.demo-slidel { animation: slide-in-left 2.5s ease-in-out infinite; }
+.demo-slider { animation: slide-in-right 2.5s ease-in-out infinite; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hero">
+    <h1>ZHIZHI UI</h1>
+    <p>深空蓝 · 科幻暗色主题 · 全平台统一视觉规范</p>
+    <div class="badge">基准：admin 端 · 唯一真实来源 frontend/src/styles/global.css · 详见 style.md</div>
+  </div>
+
+  <!-- 1. 色彩 -->
+  <section>
+    <div class="sec-title">色彩系统 / Color</div>
+    <p class="sec-desc">业务代码一律引用 CSS 变量，禁止裸色值。语义色（成功/危险/警告/信息）建议在 global.css 中正式 token 化。</p>
+    <div class="panel">
+      <div class="label-sm">品牌主色</div>
+      <div class="swatches" style="margin-bottom:24px">
+        <div class="swatch"><div class="chip" style="background:#0066FF"></div><div class="meta"><div class="name">--color-primary</div><div class="val">#0066FF</div></div></div>
+        <div class="swatch"><div class="chip" style="background:#3388FF"></div><div class="meta"><div class="name">--color-primary-light</div><div class="val">#3388FF</div></div></div>
+        <div class="swatch"><div class="chip" style="background:#0044CC"></div><div class="meta"><div class="name">--color-primary-dark</div><div class="val">#0044CC</div></div></div>
+      </div>
+      <div class="label-sm">科幻蓝色系</div>
+      <div class="swatches" style="margin-bottom:24px">
+        <div class="swatch"><div class="chip" style="background:#00D4FF"></div><div class="meta"><div class="name">--color-neon-blue</div><div class="val">#00D4FF</div></div></div>
+        <div class="swatch"><div class="chip" style="background:#0A1628"></div><div class="meta"><div class="name">--color-deep-space</div><div class="val">#0A1628</div></div></div>
+        <div class="swatch"><div class="chip" style="background:#1E3A5F"></div><div class="meta"><div class="name">--color-stellar-blue</div><div class="val">#1E3A5F</div></div></div>
+        <div class="swatch"><div class="chip" style="background:#7B61FF"></div><div class="meta"><div class="name">--color-cosmic-purple</div><div class="val">#7B61FF</div></div></div>
+      </div>
+      <div class="label-sm">语义色</div>
+      <div class="swatches" style="margin-bottom:24px">
+        <div class="swatch"><div class="chip" style="background:#00ff88"></div><div class="meta"><div class="name">--color-success</div><div class="val">#00ff88</div></div></div>
+        <div class="swatch"><div class="chip" style="background:#ff4757"></div><div class="meta"><div class="name">--color-danger</div><div class="val">#ff4757</div></div></div>
+        <div class="swatch"><div class="chip" style="background:#ffa500"></div><div class="meta"><div class="name">--color-warning</div><div class="val">#ffa500</div></div></div>
+        <div class="swatch"><div class="chip" style="background:#7b61ff"></div><div class="meta"><div class="name">--color-info</div><div class="val">#7b61ff</div></div></div>
+      </div>
+      <div class="label-sm">背景层级</div>
+      <div class="swatches" style="margin-bottom:24px">
+        <div class="swatch"><div class="chip" style="background:#0B0E14"></div><div class="meta"><div class="name">--bg-dark</div><div class="val">#0B0E14</div></div></div>
+        <div class="swatch"><div class="chip" style="background:rgba(15,23,42,0.85)"></div><div class="meta"><div class="name">--bg-card</div><div class="val">rgba(15,23,42,.85)</div></div></div>
+        <div class="swatch"><div class="chip" style="background:rgba(10,22,40,0.95)"></div><div class="meta"><div class="name">--bg-sidebar</div><div class="val">rgba(10,22,40,.95)</div></div></div>
+        <div class="swatch"><div class="chip" style="background:rgba(30,58,95,0.3)"></div><div class="meta"><div class="name">--bg-input</div><div class="val">rgba(30,58,95,.3)</div></div></div>
+      </div>
+      <div class="label-sm">文字 / 边框</div>
+      <div class="swatches">
+        <div class="swatch"><div class="chip" style="background:#E8F4FD"></div><div class="meta"><div class="name">--text-primary</div><div class="val">#E8F4FD</div></div></div>
+        <div class="swatch"><div class="chip" style="background:rgba(232,244,253,0.7)"></div><div class="meta"><div class="name">--text-secondary</div><div class="val">opacity .7</div></div></div>
+        <div class="swatch"><div class="chip" style="background:rgba(232,244,253,0.4)"></div><div class="meta"><div class="name">--text-muted</div><div class="val">opacity .4</div></div></div>
+        <div class="swatch"><div class="chip" style="background:rgba(0,102,255,0.2)"></div><div class="meta"><div class="name">--border-color</div><div class="val">rgba(0,102,255,.2)</div></div></div>
+        <div class="swatch"><div class="chip" style="background:rgba(0,212,255,0.3)"></div><div class="meta"><div class="name">--border-glow</div><div class="val">rgba(0,212,255,.3)</div></div></div>
+      </div>
+      <div class="label-sm">叠加色 / overlay（半透明，置于白底展示 alpha；组件内严禁裸写 rgba）</div>
+      <div class="swatches">
+        <div class="swatch"><div class="chip" style="background:linear-gradient(rgba(0,102,255,0.02),rgba(0,102,255,0.02)),#fff"></div><div class="meta"><div class="name">--overlay-primary-02</div><div class="val">rgba(0,102,255,.02)</div></div></div>
+        <div class="swatch"><div class="chip" style="background:linear-gradient(rgba(0,102,255,0.05),rgba(0,102,255,0.05)),#fff"></div><div class="meta"><div class="name">--overlay-primary-05</div><div class="val">rgba(0,102,255,.05)</div></div></div>
+        <div class="swatch"><div class="chip" style="background:linear-gradient(rgba(0,102,255,0.1),rgba(0,102,255,0.1)),#fff"></div><div class="meta"><div class="name">--overlay-primary-10</div><div class="val">rgba(0,102,255,.10)</div></div></div>
+        <div class="swatch"><div class="chip" style="background:linear-gradient(rgba(0,102,255,0.2),rgba(0,102,255,0.2)),#fff"></div><div class="meta"><div class="name">--overlay-primary-20</div><div class="val">rgba(0,102,255,.20)</div></div></div>
+        <div class="swatch"><div class="chip" style="background:linear-gradient(rgba(0,102,255,0.4),rgba(0,102,255,0.4)),#fff"></div><div class="meta"><div class="name">--overlay-primary-40</div><div class="val">rgba(0,102,255,.40)</div></div></div>
+        <div class="swatch"><div class="chip" style="background:linear-gradient(rgba(0,212,255,0.05),rgba(0,212,255,0.05)),#fff"></div><div class="meta"><div class="name">--overlay-neon-05</div><div class="val">rgba(0,212,255,.05)</div></div></div>
+        <div class="swatch"><div class="chip" style="background:linear-gradient(rgba(0,212,255,0.15),rgba(0,212,255,0.15)),#fff"></div><div class="meta"><div class="name">--overlay-neon-15</div><div class="val">rgba(0,212,255,.15)</div></div></div>
+        <div class="swatch"><div class="chip" style="background:linear-gradient(rgba(0,212,255,0.2),rgba(0,212,255,0.2)),#fff"></div><div class="meta"><div class="name">--overlay-neon-20</div><div class="val">rgba(0,212,255,.20)</div></div></div>
+        <div class="swatch"><div class="chip" style="background:linear-gradient(rgba(30,58,95,0.2),rgba(30,58,95,0.2)),#fff"></div><div class="meta"><div class="name">--overlay-stellar-20</div><div class="val">rgba(30,58,95,.20)</div></div></div>
+        <div class="swatch"><div class="chip" style="background:linear-gradient(rgba(123,97,255,0.03),rgba(123,97,255,0.03)),#fff"></div><div class="meta"><div class="name">--overlay-purple-03</div><div class="val">rgba(123,97,255,.03)</div></div></div>
+        <div class="swatch"><div class="chip" style="background:rgba(10,22,40,0.6)"></div><div class="meta"><div class="name">--overlay-deep-60</div><div class="val">rgba(10,22,40,.60)</div></div></div>
+        <div class="swatch"><div class="chip" style="background:linear-gradient(rgba(255,71,87,0.2),rgba(255,71,87,0.2)),#fff"></div><div class="meta"><div class="name">--overlay-danger-20</div><div class="val">rgba(255,71,87,.20)</div></div></div>
+        <div class="swatch"><div class="chip" style="background:linear-gradient(rgba(255,71,87,0.5),rgba(255,71,87,0.5)),#fff"></div><div class="meta"><div class="name">--overlay-danger-50</div><div class="val">rgba(255,71,87,.50)</div></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. 字体 -->
+  <section>
+    <div class="sec-title">字体排版 / Typography</div>
+    <p class="sec-desc">Orbitron（数据/数字）· Rajdhani（标题/控件/标签）· Exo 2（正文）。</p>
+    <div class="panel">
+      <div class="font-demo">
+        <div class="label-sm">Orbitron — 数字 / 数据展示</div>
+        <div class="font-orbitron" style="font-size:36px;font-weight:700">1,248 · 99.9% · ZHIZHI-AI</div>
+      </div>
+      <div class="font-demo">
+        <div class="label-sm">Rajdhani — 标题 / 按钮 / 标签</div>
+        <div class="font-rajdhani" style="font-size:28px;font-weight:700;text-transform:uppercase;letter-spacing:1px">Knowledge Base · 知识库管理</div>
+      </div>
+      <div class="font-demo">
+        <div class="label-sm">Exo 2 — 正文</div>
+        <div class="font-exo" style="font-size:15px;color:var(--text-secondary)">上传文档，自动切片向量化，三路混合检索 + Rerank 排序，智能问答。The quick brown fox jumps over the lazy dog.</div>
+      </div>
+      <div class="font-demo">
+        <div class="label-sm">渐变标题 .gradient-text</div>
+        <div class="gradient-text font-rajdhani" style="font-size:32px;font-weight:700">深空蓝 · DEEP SPACE BLUE</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. 圆角 & 阴影 -->
+  <section>
+    <div class="sec-title">圆角 / 阴影 / Radius & Shadow</div>
+    <div class="panel">
+      <div class="label-sm">圆角</div>
+      <div class="row" style="margin-bottom:28px">
+        <div class="box-demo" style="border-radius:6px"><span>sm 6</span></div>
+        <div class="box-demo" style="border-radius:10px"><span>md 10</span></div>
+        <div class="box-demo" style="border-radius:16px"><span>lg 16</span></div>
+        <div class="box-demo" style="border-radius:24px"><span>xl 24</span></div>
+      </div>
+      <div class="label-sm">阴影 / 辉光</div>
+      <div class="row">
+        <div class="box-demo" style="border-radius:12px;box-shadow:var(--shadow-card)"><span>card</span></div>
+        <div class="box-demo" style="border-radius:12px;box-shadow:var(--shadow-glow)"><span>glow</span></div>
+        <div class="box-demo" style="border-radius:12px;box-shadow:var(--shadow-neon)"><span>neon</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. 动画 -->
+  <section>
+    <div class="sec-title">过渡 & 动画 / Motion</div>
+    <p class="sec-desc">默认过渡 0.3s cubic-bezier(0.4,0,0.2,1)。下方为关键帧实时演示。</p>
+    <div class="panel">
+      <div class="row" style="gap:36px;justify-content:space-around">
+        <div class="anim-demo"><div class="stage demo-pulse"></div><div class="name">pulse-glow</div></div>
+        <div class="anim-demo"><div class="stage demo-float"></div><div class="name">float</div></div>
+        <div class="anim-demo"><div class="stage demo-fade"></div><div class="name">fade-in-up</div></div>
+        <div class="anim-demo"><div class="stage demo-slidel"></div><div class="name">slide-in-left</div></div>
+        <div class="anim-demo"><div class="stage demo-slider"></div><div class="name">slide-in-right</div></div>
+        <div class="anim-demo"><div class="typing"><span></span><span></span><span></span></div><div class="name">bounce (typing)</div></div>
+        <div class="anim-demo"><div style="font-family:'Rajdhani'">输出中<span class="cursor"></span></div><div class="name">cursor-blink</div></div>
+        <div class="anim-demo"><span class="status-dot blink" style="color:#00ff88;width:12px;height:12px"></span><div class="name">blink (status)</div></div>
+        <div class="anim-demo"><button class="shine-btn">SHINE</button><div class="name">shine (扫光)</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. 按钮 -->
+  <section>
+    <div class="sec-title">按钮 / Button</div>
+    <div class="panel">
+      <div class="label-sm">类型</div>
+      <div class="row" style="margin-bottom:22px">
+        <button class="el-button el-button--default">Default</button>
+        <button class="el-button el-button--primary">Primary</button>
+        <button class="el-button el-button--success">Success</button>
+        <button class="el-button el-button--warning">Warning</button>
+        <button class="el-button el-button--danger">Danger</button>
+        <button class="el-button el-button--info">Info</button>
+      </div>
+      <div class="label-sm">朴素 is-plain</div>
+      <div class="row">
+        <button class="el-button el-button--primary is-plain">Primary Plain</button>
+        <button class="el-button el-button--danger is-plain">Danger Plain</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6. 标签 -->
+  <section>
+    <div class="sec-title">标签 / Tag</div>
+    <div class="panel">
+      <div class="row">
+        <span class="el-tag el-tag--success">成功 Success</span>
+        <span class="el-tag el-tag--info">信息 Info</span>
+        <span class="el-tag el-tag--warning">警告 Warning</span>
+        <span class="el-tag el-tag--danger">危险 Danger</span>
+        <span class="status-badge active"><span class="status-dot"></span>active</span>
+        <span class="status-badge archived"><span class="status-dot"></span>archived</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7. 表单 -->
+  <section>
+    <div class="sec-title">表单 / Form</div>
+    <div class="panel">
+      <div class="row" style="align-items:flex-start;gap:24px">
+        <div>
+          <div class="label-sm">输入框（hover / focus / disabled）</div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <span class="el-input"><span class="el-input__wrapper"><input class="el-input__inner" placeholder="请输入内容" /></span></span>
+            <span class="el-input"><span class="el-input__wrapper is-focus"><input class="el-input__inner" value="聚焦态 focus" /></span></span>
+            <span class="el-input is-disabled"><span class="el-input__wrapper"><input class="el-input__inner" value="禁用态 disabled" disabled /></span></span>
+          </div>
+        </div>
+        <div style="flex:1;min-width:240px">
+          <div class="label-sm">文本域</div>
+          <textarea class="el-textarea__inner" placeholder="多行输入…"></textarea>
+        </div>
+      </div>
+      <div class="row" style="margin-top:22px;gap:28px">
+        <label class="el-switch is-checked"><span class="el-switch__core"></span> 开关 On</label>
+        <label class="el-switch"><span class="el-switch__core"></span> 开关 Off</label>
+        <label class="el-checkbox is-checked"><span class="el-checkbox__inner"></span> 复选选中</label>
+        <label class="el-checkbox"><span class="el-checkbox__inner"></span> 复选未选</label>
+        <label class="el-radio is-checked"><span class="el-radio__inner"></span> 单选选中</label>
+        <label class="el-radio"><span class="el-radio__inner"></span> 单选未选</label>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8. 卡片 -->
+  <section>
+    <div class="sec-title">卡片 / Card</div>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">
+      <div class="el-card">
+        <div class="el-card__header">基础卡片 el-card</div>
+        <div class="el-card__body">玻璃拟态 · backdrop-filter blur(20px) · 默认 --shadow-card。</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">文档总数</div>
+        <div class="value">1,248</div>
+      </div>
+      <div class="el-card" style="display:flex;align-items:center;gap:16px;padding:20px">
+        <div class="icon-square"><span class="icon-glow"></span>知</div>
+        <div><div class="font-rajdhani" style="font-weight:600;font-size:16px">渐变图标方块</div><div style="color:var(--text-muted);font-size:13px">icon-square + icon-glow</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9. 反馈 -->
+  <section>
+    <div class="sec-title">反馈 / Alert</div>
+    <div class="panel">
+      <div class="el-alert"><span class="el-alert__icon">ℹ</span><div><div class="el-alert__title">信息提示</div><div class="el-alert__desc">默认主色蓝 Alert。</div></div></div>
+      <div class="el-alert el-alert--success"><span class="el-alert__icon">✓</span><div><div class="el-alert__title">操作成功</div><div class="el-alert__desc">成功语义。</div></div></div>
+      <div class="el-alert el-alert--warning"><span class="el-alert__icon">⚠</span><div><div class="el-alert__title">注意</div><div class="el-alert__desc">警告语义。</div></div></div>
+      <div class="el-alert el-alert--danger" style="margin-bottom:0"><span class="el-alert__icon">✕</span><div><div class="el-alert__title">出错了</div><div class="el-alert__desc">危险语义。</div></div></div>
+    </div>
+  </section>
+
+  <!-- 10. 表格 -->
+  <section>
+    <div class="sec-title">表格 / Table</div>
+    <div class="panel">
+      <table class="el-table">
+        <thead><tr><th>文档名</th><th>类型</th><th>状态</th><th>切片数</th></tr></thead>
+        <tbody>
+          <tr><td>产品手册.pdf</td><td>PDF</td><td><span class="el-tag el-tag--success">已完成</span></td><td>128</td></tr>
+          <tr><td>FAQ.md</td><td>Markdown</td><td><span class="el-tag el-tag--warning">处理中</span></td><td>—</td></tr>
+          <tr><td>合同模板.txt</td><td>Text</td><td><span class="el-tag el-tag--danger">失败</span></td><td>0</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 11. 进度 -->
+  <section>
+    <div class="sec-title">进度条 / Progress</div>
+    <div class="panel">
+      <div class="el-progress" style="margin-bottom:16px"><div class="el-progress-bar__outer"><div class="el-progress-bar__inner" style="width:35%"></div></div><span class="el-progress__text">35%</span></div>
+      <div class="el-progress"><div class="el-progress-bar__outer"><div class="el-progress-bar__inner" style="width:78%"></div></div><span class="el-progress__text">78%</span></div>
+    </div>
+  </section>
+
+  <!-- 12. 导航 -->
+  <section>
+    <div class="sec-title">导航菜单 / Menu</div>
+    <div class="panel" style="background:var(--bg-sidebar)">
+      <ul class="el-menu" style="list-style:none">
+        <li class="el-menu-item is-active">📊 仪表盘</li>
+        <li class="el-menu-item">📚 知识库</li>
+        <li class="el-menu-item">💬 对话</li>
+        <li class="el-menu-item">⚙ 设置</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 13. 对话框 -->
+  <section>
+    <div class="sec-title">对话框 / Dialog</div>
+    <div class="el-dialog">
+      <div class="el-dialog__header"><div class="el-dialog__title">新建知识库</div></div>
+      <div class="el-dialog__body">玻璃拟态 + blur(20) + --radius-xl。表单类对话框宽度 480–700px。</div>
+      <div class="el-dialog__footer">
+        <button class="el-button el-button--default">取消</button>
+        <button class="el-button el-button--primary">确定</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 14. 消息气泡 -->
+  <section>
+    <div class="sec-title">消息气泡 / Chat Bubble</div>
+    <div class="panel">
+      <div class="msg-row">
+        <div class="avatar ai"><span class="glow"></span>AI</div>
+        <div class="bubble ai">
+          根据知识库，智知支持三路混合检索（向量 + 全文 + 关键词）并经 Rerank 重排。<span class="cursor"></span>
+          <div class="references">
+            <div class="ref-item"><div class="ref-name">产品白皮书.pdf <span class="ref-score score-high">0.92</span></div></div>
+            <div class="ref-item"><div class="ref-name">技术架构.md <span class="ref-score score-mid">0.71</span></div></div>
+            <div class="ref-item"><div class="ref-name">FAQ.txt <span class="ref-score score-low">0.48</span></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="msg-row user">
+        <div class="avatar user">我</div>
+        <div class="bubble user">智知的检索流程是怎样的？</div>
+      </div>
+      <div class="msg-row">
+        <div class="avatar ai"><span class="glow"></span>AI</div>
+        <div class="bubble ai"><div class="typing"><span></span><span></span><span></span></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 15. 空状态 -->
+  <section>
+    <div class="sec-title">空状态 / Empty</div>
+    <div class="panel">
+      <div class="empty">
+        <div class="hex-wrap"><span class="icon-glow"></span><div class="hexagon">✦</div></div>
+        <div class="empty-title gradient-text">暂无数据</div>
+        <div class="empty-subtitle">上传第一个文档，开启智能问答之旅</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 16. 工具类 -->
+  <section>
+    <div class="sec-title">工具类 / Utilities</div>
+    <div class="panel">
+      <div class="row" style="gap:18px">
+        <div class="util-box glow-text" style="background:var(--bg-input)">.glow-text 辉光文字</div>
+        <div class="util-box glow-border" style="background:var(--bg-input)">.glow-border 发光边框</div>
+        <div class="util-box glass-effect">.glass-effect 玻璃拟态</div>
+        <div class="util-box gradient-text" style="background:var(--bg-input)">.gradient-text 渐变文字</div>
+      </div>
+    </div>
+  </section>
+
+  <p style="text-align:center;color:var(--text-muted);font-size:12px;font-family:'Rajdhani',sans-serif;margin-top:40px">
+    本预览与 docs/style.md 及 frontend/src/styles/global.css 同步维护 · 修改 token 后请同步本页
+  </p>
+
+</div>
+</body>
+</html>

@@ -49,9 +49,9 @@ const allSources = computed<Source[]>(() => {
 })
 
 function scoreColor(score: number): string {
-  if (score > 0.8) return '#00ff88'
-  if (score >= 0.6) return '#00d4ff'
-  return '#7b61ff'
+  if (score > 0.8) return 'var(--color-success)'
+  if (score >= 0.6) return 'var(--color-neon-blue)'
+  return 'var(--color-info)'
 }
 
 function truncateContent(content: string, maxLen = 150): string {
@@ -264,7 +264,7 @@ async function handlePreviewSource(source: Source) {
   font-size: 14px;
   font-weight: 800;
   color: white;
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+  text-shadow: 0 0 10px var(--overlay-white-50);
 }
 
 .user-avatar {
@@ -291,7 +291,7 @@ async function handlePreviewSource(source: Source) {
   background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
   color: white;
   border-bottom-right-radius: 4px;
-  box-shadow: 0 4px 20px rgba(0, 102, 255, 0.3);
+  box-shadow: 0 4px 20px var(--overlay-primary-30);
 }
 
 .msg-ai .msg-content {
@@ -343,7 +343,7 @@ async function handlePreviewSource(source: Source) {
 }
 
 .msg-content :deep(code) {
-  background: rgba(0, 102, 255, 0.1);
+  background: var(--overlay-primary-10);
   padding: 2px 6px;
   border-radius: 4px;
   font-size: 13px;
@@ -352,7 +352,7 @@ async function handlePreviewSource(source: Source) {
 }
 
 .msg-content :deep(pre) {
-  background: rgba(0, 0, 0, 0.3);
+  background: var(--overlay-black-30);
   padding: 16px;
   border-radius: 8px;
   overflow-x: auto;
@@ -371,7 +371,7 @@ async function handlePreviewSource(source: Source) {
   padding-left: 16px;
   margin: 12px 0;
   color: var(--text-secondary);
-  background: rgba(0, 212, 255, 0.05);
+  background: var(--overlay-neon-05);
   padding: 12px 16px;
   border-radius: 0 8px 8px 0;
 }
@@ -396,7 +396,7 @@ async function handlePreviewSource(source: Source) {
 }
 
 .msg-content :deep(th) {
-  background: rgba(0, 102, 255, 0.1);
+  background: var(--overlay-primary-10);
   font-weight: 600;
   color: var(--color-neon-blue);
   font-family: 'Rajdhani', sans-serif;
@@ -408,8 +408,8 @@ async function handlePreviewSource(source: Source) {
 .msg-references {
   margin-top: 16px;
   padding: 14px 18px;
-  background: rgba(0, 212, 255, 0.03);
-  border: 1px solid rgba(0, 212, 255, 0.15);
+  background: var(--overlay-neon-03);
+  border: 1px solid var(--overlay-neon-15);
   border-radius: 10px;
   position: relative;
 }
@@ -440,7 +440,7 @@ async function handlePreviewSource(source: Source) {
 .ref-icon-wrapper {
   width: 26px;
   height: 26px;
-  background: rgba(0, 212, 255, 0.1);
+  background: var(--overlay-neon-10);
   border-radius: 6px;
   display: flex;
   align-items: center;
@@ -466,7 +466,7 @@ async function handlePreviewSource(source: Source) {
   cursor: pointer;
   position: relative;
   transition: all 0.2s ease;
-  background: rgba(0, 102, 255, 0.03);
+  background: var(--overlay-primary-03);
   border: 1px solid transparent;
 }
 
@@ -490,12 +490,12 @@ async function handlePreviewSource(source: Source) {
   display: flex;
   align-items: center;
   justify-content: center;
-  text-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
+  text-shadow: 0 0 5px var(--overlay-white-30);
 }
 
 .reference-item:hover {
-  background: rgba(0, 212, 255, 0.08);
-  border-color: rgba(0, 212, 255, 0.2);
+  background: var(--overlay-neon-08);
+  border-color: var(--overlay-neon-20);
   transform: translateX(2px);
 }
 
@@ -519,7 +519,7 @@ async function handlePreviewSource(source: Source) {
   font-weight: 700;
   font-family: 'Orbitron', monospace;
   padding: 2px 6px;
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--overlay-black-20);
   border-radius: 4px;
   flex-shrink: 0;
 }

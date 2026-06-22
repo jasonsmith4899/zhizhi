@@ -93,6 +93,13 @@ app:
       enabled: true
       model: BAAI/bge-reranker-v2-m3
       base-url: https://api.siliconflow.cn
+    # KAG 轻量知识图谱配置
+    kag:
+      enabled: true
+      extract-confidence-threshold: 0.6   # 三元组入库的最低置信度
+      max-hops: 2                          # 子图遍历最大跳数
+      max-subgraph-triples: 30            # 单次召回的最大三元组数
+      max-extract-chars: 6000             # 单文档抽取的最大字符数
 
   quota:
     free:

@@ -67,3 +67,50 @@ export function getDocumentPreview(docId: number) {
 export function getDocumentDownloadUrl(docId: number) {
   return request.get(`/documents/${docId}/download`, { responseType: 'blob' })
 }
+
+// 原始文件（用于全格式在线预览：PDF 原样渲染等）
+export function getDocumentRaw(docId: number) {
+  return request.get(`/documents/${docId}/raw`, { responseType: 'blob' })
+}
+
+// ==================== 分类 ====================
+export function getCategories(knowledgeBaseId: number) {
+  return request.get('/categories', { params: { knowledgeBaseId } })
+}
+export function createCategory(data: { knowledgeBaseId: number; parentId?: number | null; name: string; sortOrder?: number }) {
+  return request.post('/categories', data)
+}
+export function updateCategory(id: number, data: { name?: string; parentId?: number | null; sortOrder?: number }) {
+  return request.put(`/categories/${id}`, data)
+}
+export function deleteCategory(id: number) {
+  return request.delete(`/categories/${id}`)
+}
+
+// ==================== 标签 ====================
+export function getTags(knowledgeBaseId: number) {
+  return request.get('/tags', { params: { knowledgeBaseId } })
+}
+export function createTag(data: { knowledgeBaseId: number; name: string; color?: string }) {
+  return request.post('/tags', data)
+}
+export function deleteTag(id: number) {
+  return request.delete(`/tags/${id}`)
+}
+
+// ==================== 文档归类 / 标签 / 版本 ====================
+export function setDocumentCategory(docId: number, categoryId: number | null) {
+  return request.put(`/documents/${docId}/category`, { categoryId })
+}
+export function setDocumentTags(docId: number, tagIds: number[]) {
+  return request.put(`/documents/${docId}/tags`, { tagIds })
+}
+export function getDocumentTags(docId: number) {
+  return request.get(`/documents/${docId}/tags`)
+}
+export function getDocumentVersions(docId: number) {
+  return request.get(`/documents/${docId}/versions`)
+}
+export function rollbackDocumentVersion(docId: number, versionNo: number) {
+  return request.post(`/documents/${docId}/rollback/${versionNo}`)
+}

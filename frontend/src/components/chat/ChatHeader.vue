@@ -118,7 +118,7 @@ defineEmits<{
   font-size: 14px;
   font-weight: 800;
   color: white;
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+  text-shadow: 0 0 10px var(--overlay-white-50);
 }
 
 .title-text {
@@ -146,7 +146,7 @@ defineEmits<{
 
 .api-select :deep(.el-input__wrapper.is-focus) {
   border-color: var(--color-neon-blue);
-  box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.1);
+  box-shadow: 0 0 0 3px var(--overlay-neon-10);
 }
 
 .api-select :deep(.el-input__inner) {
@@ -154,9 +154,9 @@ defineEmits<{
 }
 
 .rag-tag {
-  background: rgba(0, 255, 136, 0.1);
-  border: 1px solid rgba(0, 255, 136, 0.3);
-  color: #00ff88;
+  background: var(--color-success-bg);
+  border: 1px solid var(--color-success-border);
+  color: var(--color-success);
   font-family: 'Rajdhani', sans-serif;
   font-weight: 600;
   display: flex;
@@ -167,9 +167,9 @@ defineEmits<{
 .tag-dot {
   width: 6px;
   height: 6px;
-  background: #00ff88;
+  background: var(--color-success);
   border-radius: 50%;
-  box-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+  box-shadow: var(--shadow-online);
   animation: blink 2s ease-in-out infinite;
 }
 
@@ -196,10 +196,10 @@ defineEmits<{
 }
 
 .new-chat-btn:hover {
-  background: rgba(0, 102, 255, 0.1);
+  background: var(--overlay-primary-10);
   border-color: var(--color-primary);
   color: var(--color-neon-blue);
-  box-shadow: 0 0 20px rgba(0, 102, 255, 0.2);
+  box-shadow: 0 0 20px var(--overlay-primary-20);
 }
 
 .btn-icon {

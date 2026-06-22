@@ -79,7 +79,7 @@ async function handleSubmit() {
         ElMessage.success('API Key 已创建，请立即复制保存，后续无法再次查看完整Key')
         // 显示完整的 key
         await ElMessageBox.alert(
-          `<div style="word-break: break-all; font-family: monospace; padding: 12px; background: rgba(0, 102, 255, 0.1); border-radius: 8px; border: 1px solid var(--border-color)">${res.data.keyValue}</div>`,
+          `<div style="word-break: break-all; font-family: monospace; padding: 12px; background: var(--overlay-primary-10); border-radius: 8px; border: 1px solid var(--border-color)">${res.data.keyValue}</div>`,
           '新 API Key（请复制保存）',
           { dangerouslyUseHTMLString: true, confirmButtonText: '我已保存' }
         )
@@ -117,10 +117,10 @@ function getKbName(id: number) {
 }
 
 const planMap: Record<string, { name: string; color: string; docs: string; queries: string }> = {
-  free: { name: '免费版', color: '#909399', docs: '10篇', queries: '100次/日' },
-  basic: { name: '基础版', color: '#0066FF', docs: '100篇', queries: '1000次/日' },
-  pro: { name: '专业版', color: '#00D4FF', docs: '500篇', queries: '无限' },
-  enterprise: { name: '企业版', color: '#00ff88', docs: '不限', queries: '不限' },
+  free: { name: '免费版', color: 'var(--color-neutral)', docs: '10篇', queries: '100次/日' },
+  basic: { name: '基础版', color: 'var(--color-primary)', docs: '100篇', queries: '1000次/日' },
+  pro: { name: '专业版', color: 'var(--color-neon-blue)', docs: '500篇', queries: '无限' },
+  enterprise: { name: '企业版', color: 'var(--color-success)', docs: '不限', queries: '不限' },
 }
 </script>
 
@@ -165,7 +165,7 @@ const planMap: Record<string, { name: string; color: string; docs: string; queri
           <h3>套餐信息</h3>
         </div>
         <div v-if="authStore.user" class="plan-content">
-          <div class="plan-badge" :style="{ '--plan-color': planMap[authStore.user.plan]?.color || '#909399' }">
+          <div class="plan-badge" :style="{ '--plan-color': planMap[authStore.user.plan]?.color || 'var(--color-neutral)' }">
             <div class="badge-glow"></div>
             <span class="plan-name">{{ planMap[authStore.user.plan]?.name || authStore.user.plan }}</span>
           </div>
@@ -399,7 +399,7 @@ const planMap: Record<string, { name: string; color: string; docs: string; queri
 .card-icon {
   width: 36px;
   height: 36px;
-  background: rgba(0, 102, 255, 0.1);
+  background: var(--overlay-primary-10);
   border-radius: 10px;
   display: flex;
   align-items: center;
@@ -408,8 +408,8 @@ const planMap: Record<string, { name: string; color: string; docs: string; queri
 }
 
 .danger-icon {
-  background: rgba(255, 71, 87, 0.1);
-  color: #ff4757;
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
 }
 
 .card-header h3 {
@@ -455,7 +455,7 @@ const planMap: Record<string, { name: string; color: string; docs: string; queri
   font-size: 28px;
   font-weight: 800;
   color: white;
-  text-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+  text-shadow: 0 0 20px var(--overlay-white-50);
 }
 
 .user-details {
@@ -493,7 +493,7 @@ const planMap: Record<string, { name: string; color: string; docs: string; queri
   align-items: center;
   justify-content: center;
   padding: 12px 32px;
-  background: linear-gradient(135deg, var(--plan-color), rgba(0, 0, 0, 0.3));
+  background: linear-gradient(135deg, var(--plan-color), var(--overlay-black-30));
   border-radius: var(--radius-lg);
   margin-bottom: 24px;
   position: relative;
@@ -512,7 +512,7 @@ const planMap: Record<string, { name: string; color: string; docs: string; queri
   font-size: 20px;
   font-weight: 700;
   color: white;
-  text-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+  text-shadow: 0 0 20px var(--overlay-white-50);
   position: relative;
   z-index: 1;
 }
@@ -567,15 +567,15 @@ const planMap: Record<string, { name: string; color: string; docs: string; queri
 
 .create-btn:hover {
   background: linear-gradient(135deg, var(--color-primary-light), var(--color-primary));
-  box-shadow: 0 0 20px rgba(0, 102, 255, 0.3);
+  box-shadow: 0 0 20px var(--overlay-primary-30);
 }
 
 .api-info {
   display: flex;
   gap: 12px;
   padding: 16px;
-  background: rgba(0, 102, 255, 0.05);
-  border: 1px solid rgba(0, 102, 255, 0.1);
+  background: var(--overlay-primary-05);
+  border: 1px solid var(--overlay-primary-10);
   border-radius: var(--radius-md);
   margin-bottom: 20px;
 }
@@ -592,7 +592,7 @@ const planMap: Record<string, { name: string; color: string; docs: string; queri
 }
 
 .info-content code {
-  background: rgba(0, 102, 255, 0.1);
+  background: var(--overlay-primary-10);
   padding: 2px 6px;
   border-radius: 4px;
   font-family: 'JetBrains Mono', monospace;
@@ -619,15 +619,15 @@ const planMap: Record<string, { name: string; color: string; docs: string; queri
   font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
   color: var(--color-neon-blue);
-  background: rgba(0, 212, 255, 0.05);
+  background: var(--overlay-neon-05);
   padding: 4px 8px;
   border-radius: 4px;
 }
 
 .kb-tag {
   margin: 2px;
-  background: rgba(0, 102, 255, 0.1);
-  border-color: rgba(0, 102, 255, 0.3);
+  background: var(--overlay-primary-10);
+  border-color: var(--overlay-primary-30);
   color: var(--color-primary-light);
 }
 
@@ -648,7 +648,7 @@ const planMap: Record<string, { name: string; color: string; docs: string; queri
 }
 
 .action-btn-danger:hover {
-  color: #ff4757;
+  color: var(--color-danger);
 }
 
 /* 空状态 */
@@ -697,27 +697,27 @@ const planMap: Record<string, { name: string; color: string; docs: string; queri
 
 /* 危险操作卡片 */
 .danger-card {
-  border-color: rgba(255, 71, 87, 0.2);
+  border-color: var(--overlay-danger-20);
 }
 
 .danger-card:hover {
-  border-color: rgba(255, 71, 87, 0.4);
-  box-shadow: 0 0 20px rgba(255, 71, 87, 0.1);
+  border-color: var(--overlay-danger-40);
+  box-shadow: 0 0 20px var(--color-danger-bg);
 }
 
 .logout-btn {
-  background: rgba(255, 71, 87, 0.1);
-  border: 1px solid rgba(255, 71, 87, 0.3);
-  color: #ff4757;
+  background: var(--color-danger-bg);
+  border: 1px solid var(--color-danger-border);
+  color: var(--color-danger);
   font-family: 'Rajdhani', sans-serif;
   font-weight: 600;
   transition: all var(--transition-normal);
 }
 
 .logout-btn:hover {
-  background: rgba(255, 71, 87, 0.2);
-  border-color: rgba(255, 71, 87, 0.5);
-  box-shadow: 0 0 20px rgba(255, 71, 87, 0.2);
+  background: var(--overlay-danger-20);
+  border-color: var(--overlay-danger-50);
+  box-shadow: 0 0 20px var(--overlay-danger-20);
 }
 
 /* 对话框 */
@@ -759,7 +759,7 @@ const planMap: Record<string, { name: string; color: string; docs: string; queri
 }
 
 .preset-btn:hover {
-  background: rgba(0, 102, 255, 0.1);
+  background: var(--overlay-primary-10);
   border-color: var(--color-primary);
   color: var(--color-neon-blue);
 }

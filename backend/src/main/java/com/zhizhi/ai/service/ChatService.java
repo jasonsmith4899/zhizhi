@@ -11,6 +11,7 @@ import com.zhizhi.ai.model.entity.KnowledgeBase;
 import com.zhizhi.ai.model.entity.Message;
 import com.zhizhi.ai.repository.ApiKeyRepository;
 import com.zhizhi.ai.repository.ConversationRepository;
+import com.zhizhi.ai.repository.DocumentTagRepository;
 import com.zhizhi.ai.repository.KnowledgeBaseRepository;
 import com.zhizhi.ai.repository.MessageRepository;
 import com.zhizhi.ai.repository.UserRepository;
@@ -43,6 +44,8 @@ public class ChatService {
     private final ChatModel chatModel;
     private final VectorStore vectorStore;
     private final HybridRetrievalService hybridRetrievalService;
+    private final KnowledgeGraphService knowledgeGraphService;
+    private final DocumentTagRepository documentTagRepository;
     private final ConversationRepository conversationRepository;
     private final KnowledgeBaseRepository knowledgeBaseRepository;
     private final MessageRepository messageRepository;
@@ -157,7 +160,7 @@ public class ChatService {
         List<ChatResponse.SourceReference> sources = new ArrayList<>();
 
         try {
-            RagContext ragCtx = buildRagContext(request.getMessage(), config.knowledgeBaseIds(), config.systemPrompt());
+            RagContext ragCtx = buildRagContext(request.getMessage(), config.knowledgeBaseIds(), config.systemPrompt(), request.getTagIds());
             sources = ragCtx.sources();
 
             // 召回不满足要求，生成礼貌拒绝回复
@@ -237,7 +240,7 @@ public class ChatService {
         StringBuilder fullReply = new StringBuilder();
 
         try {
-            RagContext ragCtx = buildRagContext(request.getMessage(), config.knowledgeBaseIds(), config.systemPrompt());
+            RagContext ragCtx = buildRagContext(request.getMessage(), config.knowledgeBaseIds(), config.systemPrompt(), request.getTagIds());
             String augmentedPrompt = ragCtx.augmentedPrompt();
             String systemPrompt = ragCtx.systemPrompt();
             sources.addAll(ragCtx.sources());
@@ -375,7 +378,7 @@ public class ChatService {
         return emitter;
     }
 
-    private RagContext buildRagContext(String message, Set<Long> knowledgeBaseIds, String systemPrompt) {
+    private RagContext buildRagContext(String message, Set<Long> knowledgeBaseIds, String systemPrompt, List<Long> tagIds) {
         Long tenantId = TenantContext.getTenantId();
 
         // 校验所有知识库的访问权限
@@ -387,26 +390,46 @@ public class ChatService {
             }
         }
 
+        // 标签过滤：解析出带有指定标签的文档范围（空集表示该标签下无文档）
+        Set<Long> allowedDocIds = null;
+        if (tagIds != null && !tagIds.isEmpty()) {
+            allowedDocIds = new HashSet<>(documentTagRepository.findDocumentIdsByTagIds(tenantId, tagIds));
+        }
+
         // 混合检索：向量搜索 + 关键词搜索 → RRF 融合 → per-doc 去重 → topK
         List<Document> filteredDocs = hybridRetrievalService.hybridSearch(
-                message, knowledgeBaseIds, tenantId);
+                message, knowledgeBaseIds, tenantId, allowedDocIds);
 
         // 检查召回质量：文档数量和最高分数
         boolean recallSatisfied = checkRecallQuality(filteredDocs);
 
-        String context = filteredDocs.stream()
-                .map(Document::getText)
-                .collect(Collectors.joining("\n---\n"));
+        // KAG：检索 query 相关的知识图谱子图（双引擎之一，无命中返回 null）
+        String subgraph = knowledgeGraphService.querySubgraph(message, knowledgeBaseIds, tenantId);
+        boolean hasSubgraph = subgraph != null && !subgraph.isBlank();
 
         String augmentedPrompt;
-        if (!recallSatisfied) {
-            // 召回不满足要求，不使用知识库内容，让大模型礼貌拒绝
+        if (!recallSatisfied && !hasSubgraph) {
+            // RAG 与 KAG 均无有效召回，不使用知识库内容，让大模型礼貌拒绝
             augmentedPrompt = null;
         } else {
-            augmentedPrompt = "根据以下参考信息回答问题：\n\n" + context + "\n\n问题：" + message;
+            StringBuilder sb = new StringBuilder("根据以下参考信息回答问题：\n\n");
+            if (recallSatisfied) {
+                String context = filteredDocs.stream()
+                        .map(Document::getText)
+                        .collect(Collectors.joining("\n---\n"));
+                sb.append("【文档片段】\n").append(context).append("\n\n");
+            }
+            if (hasSubgraph) {
+                sb.append("【知识图谱关系】\n").append(subgraph).append("\n\n");
+            }
+            sb.append("问题：").append(message);
+            augmentedPrompt = sb.toString();
         }
 
-        List<ChatResponse.SourceReference> sources = filteredDocs.stream()
+        // 来源仅在向量召回满足时展示（KAG 子图作为推理增强，不单独列为来源）
+        List<ChatResponse.SourceReference> sources = !recallSatisfied
+                ? new ArrayList<ChatResponse.SourceReference>()
+                : filteredDocs.stream()
                 .map(doc -> {
                     Long docId = null;
                     Object docIdObj = doc.getMetadata().get("document_id");

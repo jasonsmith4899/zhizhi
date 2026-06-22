@@ -10,12 +10,12 @@ import {
   getVectorStatus,
   reVectorize,
   batchDeleteDocuments,
-  getDocumentPreview,
   getDocumentDownloadUrl
 } from '../../api/knowledge'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { renderMarkdown } from '../../utils/markdown'
 import { ArrowLeft, WarningFilled, Upload, Download } from '@element-plus/icons-vue'
+import DocumentPreview from '../../components/knowledge/DocumentPreview.vue'
+import DocumentManageDialog from '../../components/knowledge/DocumentManageDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -28,12 +28,21 @@ const activeTab = ref('documents')
 
 // 文档预览
 const previewDialogVisible = ref(false)
-const previewContent = ref('')
-const previewLoading = ref(false)
 const previewFilename = ref('')
-const previewChunkCount = ref(0)
+const previewFileType = ref('')
 const previewDownloading = ref(false)
 const previewDocumentId = ref<number | null>(null)
+
+// 文档管理（分类/标签/版本）
+const manageVisible = ref(false)
+const manageDocId = ref<number | null>(null)
+const manageCategoryId = ref<number | null>(null)
+
+function openManage(row: any) {
+  manageDocId.value = row.id
+  manageCategoryId.value = row.categoryId ?? null
+  manageVisible.value = true
+}
 
 // 向量化状态
 const vectorStatusMap = ref<Record<number, any>>({})
@@ -111,24 +120,12 @@ async function handleDeleteDocument(id: number, filename: string) {
   }
 }
 
-// 文档预览
-async function handlePreview(doc: any) {
+// 文档预览（原始文件渲染：PDF 原样 / Markdown / 文本）
+function handlePreview(doc: any) {
   previewFilename.value = doc.filename
+  previewFileType.value = doc.fileType || ''
   previewDocumentId.value = doc.id
   previewDialogVisible.value = true
-  previewLoading.value = true
-  previewContent.value = ''
-  previewChunkCount.value = 0
-  try {
-    const res = await getDocumentPreview(doc.id)
-    const data = (res as any).data
-    previewContent.value = data?.content || ''
-    previewChunkCount.value = data?.chunkCount || 0
-  } catch {
-    ElMessage.error('获取文档预览失败')
-  } finally {
-    previewLoading.value = false
-  }
 }
 
 // 文档下载
@@ -302,7 +299,7 @@ function needsReVectorize(doc: any): boolean {
                       </el-tag>
                       <el-icon
                         v-if="needsReVectorize(row)"
-                        style="color: #e6a23c; margin-left: 4px; vertical-align: middle"
+                        style="color: var(--color-warning); margin-left: 4px; vertical-align: middle"
                       >
                         <WarningFilled />
                       </el-icon>
@@ -312,10 +309,10 @@ function needsReVectorize(doc: any): boolean {
                     <p style="margin: 4px 0"><strong>文档状态：</strong>{{ statusText(vectorStatusMap[row.id]?.status) }}</p>
                     <p style="margin: 4px 0"><strong>切片数量：</strong>{{ vectorStatusMap[row.id]?.chunkCount ?? 0 }}</p>
                     <p style="margin: 4px 0"><strong>向量数量：</strong>{{ vectorStatusMap[row.id]?.vectorCount ?? 0 }}</p>
-                    <p v-if="vectorStatusMap[row.id]?.errorMessage" style="margin: 4px 0; color: #f56c6c">
+                    <p v-if="vectorStatusMap[row.id]?.errorMessage" style="margin: 4px 0; color: var(--color-danger)">
                       <strong>错误信息：</strong>{{ vectorStatusMap[row.id]?.errorMessage }}
                     </p>
-                    <p v-if="needsReVectorize(row)" style="margin: 4px 0; color: #e6a23c">
+                    <p v-if="needsReVectorize(row)" style="margin: 4px 0; color: var(--color-warning)">
                       <el-icon><WarningFilled /></el-icon> 建议重新向量化
                     </p>
                   </div>
@@ -329,9 +326,10 @@ function needsReVectorize(doc: any): boolean {
                 {{ new Date(row.createdAt).toLocaleString('zh-CN') }}
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="220" align="center">
+            <el-table-column label="操作" width="300" align="center">
               <template #default="{ row }">
                 <el-button type="primary" link @click="handlePreview(row)">预览</el-button>
+                <el-button type="primary" link @click="openManage(row)">管理</el-button>
                 <el-button
                   type="warning"
                   link
@@ -358,17 +356,11 @@ function needsReVectorize(doc: any): boolean {
       width="70%"
       top="5vh"
     >
-      <div v-loading="previewLoading" style="min-height: 200px">
-        <el-empty v-if="!previewLoading && !previewContent" description="暂无文档内容" />
-        <template v-else>
-          <div class="preview-info">
-            <el-tag type="info" size="small">切片数: {{ previewChunkCount }}</el-tag>
-          </div>
-          <el-scrollbar max-height="60vh">
-            <div class="preview-content" v-html="renderMarkdown(previewContent)"></div>
-          </el-scrollbar>
-        </template>
-      </div>
+      <DocumentPreview
+        :document-id="previewDocumentId"
+        :filename="previewFilename"
+        :file-type="previewFileType"
+      />
       <template #footer>
         <el-button @click="previewDialogVisible = false">关闭</el-button>
         <el-button type="primary" :loading="previewDownloading" @click="handleDownload">
@@ -377,6 +369,15 @@ function needsReVectorize(doc: any): boolean {
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- 文档管理对话框（分类/标签/版本） -->
+    <DocumentManageDialog
+      v-model="manageVisible"
+      :document-id="manageDocId"
+      :knowledge-base-id="kbId"
+      :current-category-id="manageCategoryId"
+      @changed="loadDocuments"
+    />
   </div>
 </template>
 
@@ -397,78 +398,5 @@ function needsReVectorize(doc: any): boolean {
   border: 1px solid var(--border-color);
 }
 
-/* 卡片 - 使用 Element Plus CSS 变量 API */
-:deep(.el-card) {
-  --el-card-bg-color: var(--bg-card);
-  --el-card-border-color: var(--border-color);
-  background: var(--el-card-bg-color);
-  border-color: var(--el-card-border-color);
-}
-
-/* Tabs - 使用 Element Plus CSS 变量 API */
-:deep(.el-tabs__header) {
-  background: transparent;
-}
-
-:deep(.el-tabs__nav-wrap::after) {
-  background-color: var(--border-color);
-}
-
-/* 对话框 - 使用 Element Plus CSS 变量 API */
-:deep(.el-dialog) {
-  --el-dialog-bg-color: var(--bg-card);
-  background: var(--el-dialog-bg-color);
-}
-
-/* 描述列表 - 使用 Element Plus CSS 变量 API */
-:deep(.el-descriptions) {
-  --el-descriptions-item-bordered-label-background: rgba(0, 102, 255, 0.1);
-  --el-descriptions-table-border: var(--border-color);
-}
-
-:deep(.el-descriptions__label) {
-  background: var(--el-descriptions-item-bordered-label-background);
-}
-
-:deep(.el-descriptions__content) {
-  background: var(--bg-input);
-}
-
-/* Alert - 使用 Element Plus CSS 变量 API */
-:deep(.el-alert) {
-  --el-alert-bg-color: rgba(0, 102, 255, 0.1);
-  background: var(--el-alert-bg-color);
-}
-
-/* 表格 - 使用 Element Plus CSS 变量 API */
-:deep(.el-table) {
-  --el-table-bg-color: rgba(10, 22, 40, 0.6);
-  --el-table-tr-bg-color: transparent;
-  --el-table-header-bg-color: rgba(0, 102, 255, 0.1);
-  --el-table-row-hover-bg-color: rgba(0, 102, 255, 0.12);
-  --el-table-border-color: var(--border-color);
-  --el-table-text-color: var(--text-primary);
-  --el-table-header-text-color: var(--text-secondary);
-}
-
-/* 复选框 */
-:deep(.el-checkbox__inner) {
-  background-color: var(--bg-input);
-  border-color: var(--border-color);
-}
-
-:deep(.el-checkbox__input.is-checked .el-checkbox__inner) {
-  background-color: var(--color-primary);
-  border-color: var(--color-primary);
-}
-
-/* 上传组件 */
-:deep(.el-upload-dragger) {
-  background: var(--bg-input);
-  border-color: var(--border-color);
-}
-
-:deep(.el-upload-dragger:hover) {
-  border-color: var(--color-primary);
-}
+/* Element Plus 组件的深空蓝覆盖统一在 global.css，不在此处重复 */
 </style>

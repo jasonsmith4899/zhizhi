@@ -149,7 +149,7 @@ function roleType(role: string) {
   margin: 3px 0;
 }
 .markdown-body :deep(code) {
-  background: rgba(0, 212, 255, 0.1);
+  background: var(--overlay-neon-10);
   padding: 2px 5px;
   border-radius: 3px;
   font-size: 13px;
@@ -157,7 +157,7 @@ function roleType(role: string) {
   color: var(--color-neon-blue);
 }
 .markdown-body :deep(pre) {
-  background: rgba(0, 0, 0, 0.3);
+  background: var(--overlay-black-30);
   padding: 10px 12px;
   border-radius: 6px;
   overflow-x: auto;
@@ -184,7 +184,7 @@ function roleType(role: string) {
   font-size: 13px;
 }
 .markdown-body :deep(th) {
-  background: rgba(0, 102, 255, 0.1);
+  background: var(--overlay-primary-10);
   font-weight: 600;
   color: var(--text-primary);
 }
@@ -198,18 +198,18 @@ function roleType(role: string) {
   margin-bottom: 8px;
   border-radius: 8px;
   cursor: pointer;
-  background: rgba(30, 58, 95, 0.2);
+  background: var(--overlay-stellar-20);
   border: 1px solid transparent;
   transition: all 0.2s ease;
 }
 
 .conv-item:hover {
-  background: rgba(0, 102, 255, 0.1);
-  border-color: rgba(0, 102, 255, 0.2);
+  background: var(--overlay-primary-10);
+  border-color: var(--overlay-primary-20);
 }
 
 .conv-item-selected {
-  background: rgba(0, 102, 255, 0.15) !important;
+  background: var(--overlay-primary-15) !important;
   border-color: var(--color-primary) !important;
 }
 </style>

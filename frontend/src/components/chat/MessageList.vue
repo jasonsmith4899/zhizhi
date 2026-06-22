@@ -115,7 +115,7 @@ defineExpose({ scrollToBottom })
   font-size: 28px;
   font-weight: 800;
   color: white;
-  text-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+  text-shadow: 0 0 20px var(--overlay-white-50);
 }
 
 .empty-title {

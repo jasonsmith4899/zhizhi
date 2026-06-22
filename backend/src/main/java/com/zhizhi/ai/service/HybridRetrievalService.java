@@ -47,6 +47,14 @@ public class HybridRetrievalService {
      * 混合检索：向量搜索 + 全文搜索 + 关键词搜索 → RRF 融合 → per-doc 去重 → Rerank → topK
      */
     public List<Document> hybridSearch(String query, Set<Long> knowledgeBaseIds, Long tenantId) {
+        return hybridSearch(query, knowledgeBaseIds, tenantId, null);
+    }
+
+    /**
+     * 混合检索（带文档范围过滤）。allowedDocIds 非空时，仅保留这些文档的切片（用于标签过滤）。
+     */
+    public List<Document> hybridSearch(String query, Set<Long> knowledgeBaseIds, Long tenantId,
+                                       Set<Long> allowedDocIds) {
         // 1. 提取关键词
         List<String> keywords = extractKeywords(query);
         int expandedTopK = topK * 3;
@@ -62,6 +70,15 @@ public class HybridRetrievalService {
 
         // 5. RRF 融合（三路融合）
         List<Document> fused = rrfFusion(vectorResults, fullTextResults, keywordResults);
+
+        // 5.1 标签过滤：仅保留指定文档范围内的切片
+        if (allowedDocIds != null) {
+            Set<String> allow = allowedDocIds.stream().map(String::valueOf).collect(Collectors.toSet());
+            fused = fused.stream()
+                    .filter(d -> allow.contains(
+                            String.valueOf(d.getMetadata().getOrDefault("document_id", ""))))
+                    .collect(Collectors.toList());
+        }
 
         // 6. Per-doc 去重
         List<Document> dedupedCandidates = applyPerDocDedup(fused, knowledgeBaseIds);

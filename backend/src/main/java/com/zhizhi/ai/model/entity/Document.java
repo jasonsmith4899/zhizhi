@@ -51,6 +51,15 @@ public class Document {
     @Column(name = "error_message", length = 1000)
     private String errorMessage;
 
+    @Column(name = "content_hash", length = 64)
+    private String contentHash;  // SHA-256，用于秒传/去重
+
+    @Column(name = "mime_type", length = 100)
+    private String mimeType;     // 原始文件 MIME 类型
+
+    @Column(name = "category_id")
+    private Long categoryId;     // 归属分类
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 

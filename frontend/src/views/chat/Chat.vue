@@ -106,8 +106,8 @@ async function openPreview(docId: number) {
   right: 0;
   bottom: 0;
   background:
-    radial-gradient(ellipse at 50% 0%, rgba(0, 102, 255, 0.05) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 80%, rgba(0, 212, 255, 0.03) 0%, transparent 50%);
+    radial-gradient(ellipse at 50% 0%, var(--overlay-primary-05) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, var(--overlay-neon-03) 0%, transparent 50%);
   pointer-events: none;
   z-index: 0;
 }
@@ -120,8 +120,8 @@ async function openPreview(docId: number) {
   right: 0;
   bottom: 0;
   background-image:
-    linear-gradient(rgba(0, 102, 255, 0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 102, 255, 0.02) 1px, transparent 1px);
+    linear-gradient(var(--overlay-primary-02) 1px, transparent 1px),
+    linear-gradient(90deg, var(--overlay-primary-02) 1px, transparent 1px);
   background-size: 40px 40px;
   pointer-events: none;
   z-index: 0;

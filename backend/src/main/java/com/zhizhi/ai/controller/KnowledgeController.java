@@ -1,5 +1,6 @@
 package com.zhizhi.ai.controller;
 
+import com.zhizhi.ai.common.Auditable;
 import com.zhizhi.ai.common.AuthUtil;
 import com.zhizhi.ai.common.Result;
 import com.zhizhi.ai.model.dto.KnowledgeBaseDTO;
@@ -21,6 +22,7 @@ public class KnowledgeController {
     private final AuthUtil authUtil;
 
     @PostMapping
+    @Auditable(action = "CREATE", targetType = "knowledge_base")
     public Result<KnowledgeBaseDTO> create(@Valid @RequestBody KnowledgeBaseRequest request,
                                          Authentication authentication) {
         return Result.ok(KnowledgeBaseDTO.fromEntity(
@@ -51,6 +53,7 @@ public class KnowledgeController {
     }
 
     @DeleteMapping("/{id}")
+    @Auditable(action = "DELETE", targetType = "knowledge_base")
     public Result<Void> delete(@PathVariable Long id, Authentication authentication) {
         knowledgeService.delete(id, authUtil.getUserId(authentication));
         return Result.ok();

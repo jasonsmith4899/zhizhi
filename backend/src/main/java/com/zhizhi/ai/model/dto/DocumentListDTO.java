@@ -18,6 +18,7 @@ public class DocumentListDTO {
     private Long fileSize;
     private String status;
     private Integer chunkCount;
+    private Long categoryId;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -29,6 +30,7 @@ public class DocumentListDTO {
                 .fileSize(doc.getFileSize())
                 .status(doc.getStatus())
                 .chunkCount(doc.getChunkCount())
+                .categoryId(doc.getCategoryId())
                 .createdAt(doc.getCreatedAt())
                 .updatedAt(doc.getUpdatedAt())
                 .build();

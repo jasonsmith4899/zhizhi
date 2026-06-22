@@ -19,4 +19,7 @@ public class ChatRequest {
 
     /** 会话ID（可选，传入则继续多轮对话） */
     private String sessionId;
+
+    /** 标签过滤（可选，传入则仅检索带这些标签的文档） */
+    private java.util.List<Long> tagIds;
 }

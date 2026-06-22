@@ -110,7 +110,7 @@ defineExpose({ clear })
 
 .message-input :deep(.el-textarea__inner:focus) {
   border-color: var(--color-neon-blue);
-  box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.1);
+  box-shadow: 0 0 0 3px var(--overlay-neon-10);
 }
 
 .message-input :deep(.el-textarea__inner::placeholder) {
@@ -152,7 +152,7 @@ defineExpose({ clear })
 
 .send-btn:hover {
   background: linear-gradient(135deg, var(--color-primary-light), var(--color-primary));
-  box-shadow: 0 0 30px rgba(0, 102, 255, 0.4);
+  box-shadow: 0 0 30px var(--overlay-primary-40);
   transform: translateY(-2px);
 }
 
@@ -182,7 +182,7 @@ defineExpose({ clear })
   left: -100%;
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  background: linear-gradient(90deg, transparent, var(--overlay-white-20), transparent);
   transition: left 0.5s ease;
 }
 

@@ -127,10 +127,13 @@ public class RerankerService {
 
             if (index >= 0 && index < candidates.size()) {
                 Document doc = candidates.get(index);
-                // 创建新的 Document 对象，保留原有 metadata，使用得分更新
+                // 创建新的 Document 对象，保留原有 metadata，使用 Reranker 得分
                 Map<String, Object> metadata = new HashMap<>(doc.getMetadata());
-                Document rerankDoc = new Document(doc.getText(), metadata);
-                rerankDoc.score = score;  // 直接赋值 score 字段
+                Document rerankDoc = Document.builder()
+                        .text(doc.getText())
+                        .metadata(metadata)
+                        .score(score)
+                        .build();
                 reranked.add(rerankDoc);
             }
         });

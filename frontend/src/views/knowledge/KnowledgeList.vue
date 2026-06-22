@@ -215,7 +215,7 @@ async function handleDelete(id: number, name: string) {
 
 .create-btn:hover {
   background: linear-gradient(135deg, var(--color-primary-light), var(--color-primary));
-  box-shadow: 0 0 30px rgba(0, 102, 255, 0.4);
+  box-shadow: 0 0 30px var(--overlay-primary-40);
   transform: translateY(-2px);
 }
 
@@ -225,7 +225,7 @@ async function handleDelete(id: number, name: string) {
   left: -100%;
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  background: linear-gradient(90deg, transparent, var(--overlay-white-20), transparent);
   transition: left 0.5s ease;
 }
 
@@ -309,15 +309,15 @@ async function handleDelete(id: number, name: string) {
 }
 
 .kb-status.active {
-  background: rgba(0, 255, 136, 0.1);
-  color: #00ff88;
-  border: 1px solid rgba(0, 255, 136, 0.3);
+  background: var(--color-success-bg);
+  color: var(--color-success);
+  border: 1px solid var(--color-success-border);
 }
 
 .kb-status.archived {
-  background: rgba(123, 97, 255, 0.1);
-  color: #7b61ff;
-  border: 1px solid rgba(123, 97, 255, 0.3);
+  background: var(--color-info-bg);
+  color: var(--color-info);
+  border: 1px solid var(--color-info-border);
 }
 
 .status-dot {
@@ -424,7 +424,7 @@ async function handleDelete(id: number, name: string) {
 }
 
 .action-btn-danger:hover {
-  color: #ff4757;
+  color: var(--color-danger);
 }
 
 /* 装饰元素 */

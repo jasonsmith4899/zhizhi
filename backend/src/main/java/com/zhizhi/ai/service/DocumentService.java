@@ -4,9 +4,12 @@ import com.zhizhi.ai.common.BusinessException;
 import com.zhizhi.ai.common.TenantContext;
 import com.zhizhi.ai.model.entity.Document;
 import com.zhizhi.ai.model.entity.DocumentChunk;
+import com.zhizhi.ai.model.entity.DocumentVersion;
 import com.zhizhi.ai.model.entity.KnowledgeBase;
 import com.zhizhi.ai.repository.DocumentChunkRepository;
 import com.zhizhi.ai.repository.DocumentRepository;
+import com.zhizhi.ai.repository.DocumentTagRepository;
+import com.zhizhi.ai.repository.DocumentVersionRepository;
 import com.zhizhi.ai.repository.KnowledgeBaseRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,10 +46,12 @@ public class DocumentService {
     private final KnowledgeBaseRepository knowledgeBaseRepository;
     private final VectorStore vectorStore;
     private final JdbcTemplate jdbcTemplate;
-
-    @Autowired
-    @Lazy
-    private DocumentService self;
+    private final KnowledgeGraphService knowledgeGraphService;
+    private final FileStorageService fileStorageService;
+    private final DocumentVersionRepository documentVersionRepository;
+    private final DocumentTagRepository documentTagRepository;
+    private final TagService tagService;
+    private final org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     @Value("${app.ai.chunk-size:500}")
     private int chunkSize;
@@ -85,6 +90,19 @@ public class DocumentService {
             throw BusinessException.badRequest("不支持的文件格式，仅支持 PDF/TXT/MD");
         }
 
+        // 提取文件字节（避免MultipartFile在异步线程中失效）
+        byte[] fileBytes = file.getBytes();
+        String hash = sha256(fileBytes);
+
+        // 秒传：同知识库内已存在相同内容且处理完成的文档，直接复用，跳过存储与向量化
+        Document existing = documentRepository
+                .findFirstByTenantIdAndKnowledgeBaseIdAndContentHashAndStatus(tenantId, knowledgeBaseId, hash, "ready")
+                .orElse(null);
+        if (existing != null) {
+            log.info("秒传命中，跳过重复处理: hash={}, 复用 docId={}", hash, existing.getId());
+            return existing;
+        }
+
         // 创建文档记录
         Document document = Document.builder()
                 .knowledgeBase(kb)
@@ -92,21 +110,18 @@ public class DocumentService {
                 .filename(filename)
                 .fileType(fileType)
                 .fileSize(file.getSize())
+                .contentHash(hash)
+                .mimeType(file.getContentType())
                 .status("processing")
                 .build();
         document = documentRepository.save(document);
 
-        // 提取文件字节（避免MultipartFile在异步线程中失效）
-        byte[] fileBytes = file.getBytes();
+        // 存储原始文件（供在线预览）
+        fileStorageService.store(document.getId(), tenantId, fileBytes);
 
-        // 在事务提交后再启动异步处理（避免事务未提交导致读不到document）
-        final Long docId = document.getId();
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                self.processDocumentAsync(docId, fileBytes, filename, knowledgeBaseId);
-            }
-        });
+        // 发布处理事件，由监听器在事务提交后异步处理（解析/切片/向量化/图谱解耦）
+        eventPublisher.publishEvent(new com.zhizhi.ai.event.DocumentProcessEvent(
+                document.getId(), fileBytes, filename, knowledgeBaseId));
 
         return document;
     }
@@ -195,6 +210,12 @@ public class DocumentService {
 
             log.info("文档处理完成: id={}, filename={}, chunks={}",
                     documentId, document.getFilename(), chunkResults.size());
+
+            // KAG：抽取实体关系构建知识图谱（增强项，失败不影响主流程）
+            knowledgeGraphService.extractAndStore(documentId, knowledgeBaseId, tenantId, content);
+
+            // 版本管理：每次成功处理后保存内容快照
+            saveVersionSnapshot(documentId, tenantId, content, chunkResults.size());
 
         } catch (Exception e) {
             log.error("文档处理失败: id={}", documentId, e);
@@ -468,7 +489,14 @@ public class DocumentService {
         } else {
             chunkRepository.deleteByDocumentId(documentId);
         }
+        // 清理版本与标签关联
+        documentVersionRepository.deleteByDocumentId(documentId);
+        documentTagRepository.deleteByDocumentId(documentId);
+
         documentRepository.delete(doc);
+
+        // 清理 KAG 图谱关系
+        knowledgeGraphService.deleteByDocument(documentId);
 
         updateKnowledgeBaseStats(doc.getKnowledgeBase().getId());
     }
@@ -543,6 +571,9 @@ public class DocumentService {
             log.warn("Failed to delete vectors from vector store", e);
         }
 
+        // 清理旧的 KAG 图谱关系（重新向量化时会重新抽取）
+        knowledgeGraphService.deleteByDocument(documentId);
+
         doc.setStatus("processing");
         doc.setChunkCount(0);
         doc.setErrorMessage(null);
@@ -553,7 +584,8 @@ public class DocumentService {
         String content = doc.getContent();
         if (content != null && !content.isEmpty()) {
             byte[] contentBytes = content.getBytes(java.nio.charset.StandardCharsets.UTF_8);
-            self.processDocumentAsync(documentId, contentBytes, filename, kbId);
+            eventPublisher.publishEvent(new com.zhizhi.ai.event.DocumentProcessEvent(
+                    documentId, contentBytes, filename, kbId));
         } else {
             log.warn("Document content is empty, cannot re-vectorize: id={}", documentId);
             doc.setStatus("failed");
@@ -634,6 +666,98 @@ public class DocumentService {
         return result;
     }
 
+    // ==================== 分类 / 标签 / 版本 ====================
+
+    /** 设置文档归属分类（categoryId 为 null 表示取消归类） */
+    @Transactional
+    public Document setCategory(Long documentId, Long categoryId, Long userId) {
+        Document doc = validateDocumentAccess(documentId, userId);
+        doc.setCategoryId(categoryId);
+        return documentRepository.save(doc);
+    }
+
+    /** 设置文档标签（全量覆盖） */
+    @Transactional
+    public void setTags(Long documentId, List<Long> tagIds, Long userId) {
+        validateDocumentAccess(documentId, userId);
+        tagService.setDocumentTags(documentId, tagIds, TenantContext.getTenantId());
+    }
+
+    /** 获取文档标签 ID 列表 */
+    public List<Long> getDocumentTagIds(Long documentId, Long userId) {
+        validateDocumentAccess(documentId, userId);
+        return tagService.getDocumentTagIds(documentId);
+    }
+
+    /** 版本列表（按版本号倒序） */
+    public List<DocumentVersion> listVersions(Long documentId, Long userId) {
+        validateDocumentAccess(documentId, userId);
+        return documentVersionRepository.findByDocumentIdOrderByVersionNoDesc(documentId);
+    }
+
+    /** 回滚到指定版本：用历史内容重建切片与向量 */
+    @Transactional
+    public void rollback(Long documentId, Integer versionNo, Long userId) {
+        Document doc = validateDocumentAccess(documentId, userId);
+        DocumentVersion v = documentVersionRepository.findByDocumentIdAndVersionNo(documentId, versionNo)
+                .orElseThrow(() -> BusinessException.notFound("文档版本"));
+        if (v.getContent() == null || v.getContent().isEmpty()) {
+            throw BusinessException.badRequest("该版本无内容，无法回滚");
+        }
+        doc.setContent(v.getContent());
+        documentRepository.save(doc);
+        // 复用重新向量化链路：用回滚后的 content 重建（完成后会自动生成新版本快照）
+        reVectorize(documentId, userId);
+    }
+
+    /** 保存内容快照为新版本（在异步处理线程中调用） */
+    private void saveVersionSnapshot(Long documentId, Long tenantId, String content, int chunkCount) {
+        try {
+            int nextNo = documentVersionRepository.findTopByDocumentIdOrderByVersionNoDesc(documentId)
+                    .map(v -> v.getVersionNo() + 1).orElse(1);
+            documentVersionRepository.save(DocumentVersion.builder()
+                    .documentId(documentId)
+                    .tenantId(tenantId)
+                    .versionNo(nextNo)
+                    .content(content)
+                    .chunkCount(chunkCount)
+                    .remark(nextNo == 1 ? "首次上传" : "重新处理快照")
+                    .build());
+        } catch (Exception e) {
+            log.warn("保存文档版本快照失败: docId={}, err={}", documentId, e.getMessage());
+        }
+    }
+
+    /**
+     * 获取原始文件字节（供前端原样预览：PDF 渲染、文本/Markdown 等）
+     */
+    public Map<String, Object> getRawFile(Long documentId, Long userId) {
+        Document doc = validateDocumentAccess(documentId, userId);
+        byte[] data = fileStorageService.load(documentId);
+        if (data == null) {
+            throw BusinessException.notFound("原始文件（该文档上传于旧版本，无原始文件）");
+        }
+        String mime = doc.getMimeType();
+        if (mime == null || mime.isBlank()) {
+            mime = guessMime(doc.getFileType());
+        }
+        Map<String, Object> result = new HashMap<>();
+        result.put("filename", doc.getFilename());
+        result.put("content", data);
+        result.put("contentType", mime);
+        return result;
+    }
+
+    private String guessMime(String fileType) {
+        if (fileType == null) return "application/octet-stream";
+        return switch (fileType) {
+            case "pdf" -> "application/pdf";
+            case "md", "markdown" -> "text/markdown; charset=utf-8";
+            case "txt" -> "text/plain; charset=utf-8";
+            default -> "application/octet-stream";
+        };
+    }
+
     @Transactional
     public void batchDelete(List<Long> documentIds, Long userId) {
         if (documentIds == null || documentIds.isEmpty()) {
@@ -667,6 +791,9 @@ public class DocumentService {
             } catch (Exception e) {
                 log.warn("Failed to delete vectors for document {}", docId, e);
             }
+            documentVersionRepository.deleteByDocumentId(docId);
+            documentTagRepository.deleteByDocumentId(docId);
+            knowledgeGraphService.deleteByDocument(docId);
             documentRepository.delete(doc);
         }
 
@@ -691,6 +818,21 @@ public class DocumentService {
             throw BusinessException.forbidden("无权访问此文档");
         }
         return doc;
+    }
+
+    /**
+     * 计算文件 SHA-256（十六进制）
+     */
+    private String sha256(byte[] bytes) {
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] digest = md.digest(bytes);
+            StringBuilder sb = new StringBuilder(digest.length * 2);
+            for (byte b : digest) sb.append(String.format("%02x", b));
+            return sb.toString();
+        } catch (java.security.NoSuchAlgorithmException e) {
+            return null;
+        }
     }
 
     /**

@@ -224,8 +224,8 @@ async function handleSubmit() {
   right: 0;
   bottom: 0;
   background-image:
-    linear-gradient(rgba(0, 102, 255, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 102, 255, 0.05) 1px, transparent 1px);
+    linear-gradient(var(--overlay-primary-05) 1px, transparent 1px),
+    linear-gradient(90deg, var(--overlay-primary-05) 1px, transparent 1px);
   background-size: 30px 30px;
   pointer-events: none;
 }
@@ -237,7 +237,7 @@ async function handleSubmit() {
   min-height: 520px;
   border-radius: var(--radius-xl);
   overflow: hidden;
-  box-shadow: 0 25px 80px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 25px 80px var(--overlay-black-50);
   border: 1px solid var(--border-color);
   position: relative;
   z-index: 10;
@@ -263,7 +263,7 @@ async function handleSubmit() {
   left: -50%;
   width: 200%;
   height: 200%;
-  background: radial-gradient(circle, rgba(0, 212, 255, 0.1) 0%, transparent 50%);
+  background: radial-gradient(circle, var(--overlay-neon-10) 0%, transparent 50%);
   animation: rotate 20s linear infinite;
 }
 
@@ -339,7 +339,7 @@ async function handleSubmit() {
 
 .circle {
   position: absolute;
-  border: 1px solid rgba(0, 212, 255, 0.2);
+  border: 1px solid var(--overlay-neon-20);
   border-radius: 50%;
   animation: float 6s ease-in-out infinite;
 }
@@ -409,7 +409,7 @@ async function handleSubmit() {
 }
 
 .login-form :deep(.el-input__wrapper) {
-  background: rgba(30, 58, 95, 0.3);
+  background: var(--bg-input);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   box-shadow: none;
@@ -422,7 +422,7 @@ async function handleSubmit() {
 
 .login-form :deep(.el-input__wrapper.is-focus) {
   border-color: var(--color-neon-blue);
-  box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.1);
+  box-shadow: 0 0 0 3px var(--overlay-neon-10);
 }
 
 .login-form :deep(.el-input__inner) {
@@ -450,7 +450,7 @@ async function handleSubmit() {
 
 .submit-btn:hover {
   background: linear-gradient(135deg, var(--color-primary-light) 0%, var(--color-primary) 100%);
-  box-shadow: 0 0 30px rgba(0, 102, 255, 0.4);
+  box-shadow: 0 0 30px var(--overlay-primary-40);
   transform: translateY(-2px);
 }
 
@@ -465,7 +465,7 @@ async function handleSubmit() {
   left: -100%;
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  background: linear-gradient(90deg, transparent, var(--overlay-white-20), transparent);
   transition: left 0.5s ease;
 }
 
@@ -495,7 +495,7 @@ async function handleSubmit() {
   position: absolute;
   width: 60px;
   height: 60px;
-  background: linear-gradient(135deg, rgba(0, 102, 255, 0.1), rgba(0, 212, 255, 0.05));
+  background: linear-gradient(135deg, var(--overlay-primary-10), var(--overlay-neon-05));
   clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
   animation: float 8s ease-in-out infinite;
 }

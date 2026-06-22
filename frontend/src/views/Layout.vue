@@ -153,8 +153,8 @@ const menuItems = [
   right: 0;
   bottom: 0;
   background:
-    linear-gradient(180deg, rgba(0, 102, 255, 0.05) 0%, transparent 50%),
-    radial-gradient(ellipse at bottom left, rgba(0, 212, 255, 0.08) 0%, transparent 50%);
+    linear-gradient(180deg, var(--overlay-primary-05) 0%, transparent 50%),
+    radial-gradient(ellipse at bottom left, var(--overlay-neon-08) 0%, transparent 50%);
   pointer-events: none;
 }
 
@@ -212,7 +212,7 @@ const menuItems = [
   font-size: 20px;
   font-weight: 800;
   color: white;
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+  text-shadow: 0 0 10px var(--overlay-white-50);
 }
 
 .logo-text {
@@ -267,7 +267,7 @@ const menuItems = [
 }
 
 .menu-item:hover {
-  background: rgba(0, 102, 255, 0.1);
+  background: var(--overlay-primary-10);
 }
 
 .menu-item:hover::before {
@@ -275,8 +275,8 @@ const menuItems = [
 }
 
 .menu-item.is-active {
-  background: rgba(0, 102, 255, 0.15);
-  box-shadow: 0 0 20px rgba(0, 102, 255, 0.1);
+  background: var(--overlay-primary-15);
+  box-shadow: 0 0 20px var(--overlay-primary-10);
 }
 
 .menu-item.is-active::before {
@@ -392,7 +392,7 @@ const menuItems = [
 }
 
 .collapse-btn:hover {
-  background: rgba(0, 102, 255, 0.1);
+  background: var(--overlay-primary-10);
   color: var(--color-neon-blue);
 }
 
@@ -434,7 +434,7 @@ const menuItems = [
 }
 
 .user-info:hover {
-  background: rgba(0, 102, 255, 0.1);
+  background: var(--overlay-primary-10);
 }
 
 .user-avatar {
@@ -454,9 +454,9 @@ const menuItems = [
 .user-status {
   width: 8px;
   height: 8px;
-  background: #00ff88;
+  background: var(--color-success);
   border-radius: 50%;
-  box-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+  box-shadow: var(--shadow-online);
 }
 
 /* 主内容区 */
@@ -475,8 +475,8 @@ const menuItems = [
   right: 0;
   bottom: 0;
   background:
-    radial-gradient(ellipse at 80% 20%, rgba(0, 102, 255, 0.05) 0%, transparent 50%),
-    radial-gradient(ellipse at 20% 80%, rgba(123, 97, 255, 0.03) 0%, transparent 50%);
+    radial-gradient(ellipse at 80% 20%, var(--overlay-primary-05) 0%, transparent 50%),
+    radial-gradient(ellipse at 20% 80%, var(--overlay-purple-03) 0%, transparent 50%);
   pointer-events: none;
   z-index: 0;
 }

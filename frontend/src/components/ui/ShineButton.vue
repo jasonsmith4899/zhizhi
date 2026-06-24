@@ -41,7 +41,7 @@ defineEmits<{ click: [e: MouseEvent] }>()
   border: none;
   cursor: pointer;
   background: var(--gradient-btn-primary);
-  color: #fff;
+  color: var(--color-text-on-accent);
   font-family: 'Rajdhani', sans-serif;
   font-weight: 600;
   letter-spacing: 0.5px;

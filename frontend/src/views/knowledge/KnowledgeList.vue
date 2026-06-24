@@ -280,7 +280,7 @@ async function handleDelete(id: number, name: string) {
   align-items: center;
   justify-content: center;
   position: relative;
-  color: white;
+  color: var(--color-text-on-accent);
 }
 
 .icon-glow {
@@ -494,7 +494,7 @@ async function handleDelete(id: number, name: string) {
   justify-content: center;
   position: relative;
   z-index: 1;
-  color: white;
+  color: var(--color-text-on-accent);
 }
 
 .empty-title {

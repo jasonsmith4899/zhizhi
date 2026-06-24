@@ -114,7 +114,7 @@ defineExpose({ scrollToBottom })
   font-family: 'Orbitron', monospace;
   font-size: 28px;
   font-weight: 800;
-  color: white;
+  color: var(--color-text-on-accent);
   text-shadow: 0 0 20px var(--overlay-white-50);
 }
 

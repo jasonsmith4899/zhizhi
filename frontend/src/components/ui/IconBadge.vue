@@ -39,7 +39,7 @@ withDefaults(defineProps<Props>(), {
 .radius-button { border-radius: var(--radius-button); }
 .radius-icon { border-radius: var(--radius-icon); }
 .radius-pill { border-radius: var(--radius-pill); }
-.variant-gradient { background: var(--gradient-icon); color: #fff; }
+.variant-gradient { background: var(--gradient-icon); color: var(--color-text-on-accent); }
 .variant-ghost { background: var(--overlay-primary-10); color: var(--color-neon-blue); }
 .variant-ghost-danger { background: var(--color-danger-bg); color: var(--color-danger); }
 .content {

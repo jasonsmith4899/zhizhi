@@ -454,7 +454,7 @@ const planMap: Record<string, { name: string; color: string; docs: string; queri
   font-family: 'Orbitron', monospace;
   font-size: 28px;
   font-weight: 800;
-  color: white;
+  color: var(--color-text-on-accent);
   text-shadow: 0 0 20px var(--overlay-white-50);
 }
 
@@ -511,7 +511,7 @@ const planMap: Record<string, { name: string; color: string; docs: string; queri
   font-family: 'Orbitron', monospace;
   font-size: 20px;
   font-weight: 700;
-  color: white;
+  color: var(--color-text-on-accent);
   text-shadow: 0 0 20px var(--overlay-white-50);
   position: relative;
   z-index: 1;
@@ -684,7 +684,7 @@ const planMap: Record<string, { name: string; color: string; docs: string; queri
   justify-content: center;
   position: relative;
   z-index: 1;
-  color: white;
+  color: var(--color-text-on-accent);
 }
 
 .empty-title {

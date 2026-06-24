@@ -29,7 +29,7 @@ withDefaults(defineProps<Props>(), {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  color: #fff;
+  color: var(--color-text-on-accent);
   font-family: 'Rajdhani', sans-serif;
   font-weight: 700;
   border-radius: var(--radius-icon);

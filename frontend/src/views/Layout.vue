@@ -8,6 +8,7 @@ import {
   ChatDotRound,
   Document,
   Setting,
+  Tickets,
   Fold,
   Expand,
 } from '@element-plus/icons-vue'
@@ -23,6 +24,7 @@ const iconMap: Record<string, any> = {
   ChatDotRound,
   Document,
   Setting,
+  Tickets,
 }
 
 onMounted(() => {
@@ -40,6 +42,7 @@ const menuItems = [
   { path: '/chat', icon: 'ChatDotRound', title: 'AI 对话' },
   { path: '/chat-history', icon: 'Document', title: '对话记录' },
   { path: '/profile', icon: 'Setting', title: '个人设置' },
+  { path: '/audit-logs', icon: 'Tickets', title: '操作审计' },
 ]
 </script>
 
@@ -211,7 +214,7 @@ const menuItems = [
   font-family: 'Orbitron', monospace;
   font-size: 20px;
   font-weight: 800;
-  color: white;
+  color: var(--color-text-on-accent);
   text-shadow: 0 0 10px var(--overlay-white-50);
 }
 

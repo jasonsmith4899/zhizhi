@@ -30,7 +30,7 @@ withDefaults(defineProps<Props>(), {
   justify-content: center;
   clip-path: var(--clip-hexagon);
   background: var(--gradient-icon);
-  color: #fff;
+  color: var(--color-text-on-accent);
 }
 .size-sm { width: var(--size-hex-sm); height: var(--size-hex-sm); }
 .size-md { width: var(--size-hex-md); height: var(--size-hex-md); }

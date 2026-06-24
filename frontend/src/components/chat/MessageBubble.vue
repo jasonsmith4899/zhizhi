@@ -263,7 +263,7 @@ async function handlePreviewSource(source: Source) {
   font-family: 'Orbitron', monospace;
   font-size: 14px;
   font-weight: 800;
-  color: white;
+  color: var(--color-text-on-accent);
   text-shadow: 0 0 10px var(--overlay-white-50);
 }
 
@@ -289,7 +289,7 @@ async function handlePreviewSource(source: Source) {
 
 .msg-user .msg-content {
   background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
-  color: white;
+  color: var(--color-text-on-accent);
   border-bottom-right-radius: 4px;
   box-shadow: 0 4px 20px var(--overlay-primary-30);
 }
@@ -482,7 +482,7 @@ async function handlePreviewSource(source: Source) {
   width: 22px;
   height: 22px;
   background: linear-gradient(135deg, var(--color-primary), var(--color-neon-blue));
-  color: white;
+  color: var(--color-text-on-accent);
   font-size: 11px;
   font-weight: 700;
   font-family: 'Orbitron', monospace;

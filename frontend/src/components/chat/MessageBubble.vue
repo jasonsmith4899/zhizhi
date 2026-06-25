@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { renderMarkdown, extractInlineSources } from '../../utils/markdown'
 import { getDocumentChunks } from '../../api/knowledge'
+import { Connection } from '@element-plus/icons-vue'
 
 interface Source {
   documentId?: number
@@ -11,11 +12,19 @@ interface Source {
   chunkId?: number
 }
 
+interface KagSource {
+  sourceName: string
+  predicate: string
+  targetName: string
+  confidence?: number
+}
+
 const props = defineProps<{
   message: {
     role: string
     content: string
     sources?: Source[]
+    kagSources?: KagSource[]
     time: Date
   }
   isStreaming?: boolean
@@ -181,6 +190,22 @@ async function handlePreviewSource(source: Source) {
             </div>
           </li>
         </ol>
+      </div>
+
+      <!-- 知识图谱来源 -->
+      <div v-if="message.kagSources?.length" class="kag-sources">
+        <div class="kag-sources-header">
+          <el-icon><Connection /></el-icon>
+          <span>知识图谱</span>
+        </div>
+        <div class="kag-triple-list">
+          <div v-for="(triple, i) in message.kagSources" :key="i" class="kag-triple">
+            <span class="kag-source-name">{{ triple.sourceName }}</span>
+            <span class="kag-predicate">—{{ triple.predicate }}→</span>
+            <span class="kag-target-name">{{ triple.targetName }}</span>
+            <span v-if="triple.confidence != null" class="kag-confidence">{{ Math.round(triple.confidence * 100) }}%</span>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -529,6 +554,61 @@ async function handlePreviewSource(source: Source) {
   color: var(--text-muted);
   line-height: 1.5;
   padding-left: 2px;
+}
+
+/* ===== 知识图谱来源 ===== */
+.kag-sources {
+  margin-top: 12px;
+  padding: 12px 16px;
+  background: var(--overlay-neon-05);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+
+.kag-sources-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-neon-blue);
+  font-family: 'Rajdhani', sans-serif;
+}
+
+.kag-triple-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.kag-triple {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--overlay-primary-05);
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.kag-source-name,
+.kag-target-name {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.kag-predicate {
+  color: var(--color-neon-blue);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.kag-confidence {
+  margin-left: auto;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-family: 'Orbitron', monospace;
 }
 
 /* ===== 预览对话框样式 ===== */

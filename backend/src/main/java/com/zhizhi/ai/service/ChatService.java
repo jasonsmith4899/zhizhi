@@ -39,7 +39,8 @@ import java.util.stream.Stream;
 public class ChatService {
 
     private record RagContext(String augmentedPrompt, String systemPrompt,
-                              List<ChatResponse.SourceReference> sources) {}
+                              List<ChatResponse.SourceReference> sources,
+                              List<Map<String, Object>> kagTriples) {}
 
     private final ChatModel chatModel;
     private final VectorStore vectorStore;
@@ -245,6 +246,7 @@ public class ChatService {
             String systemPrompt = ragCtx.systemPrompt();
             sources.addAll(ragCtx.sources());
             final List<ChatResponse.SourceReference> finalSources = sources;
+            final List<Map<String, Object>> finalKagTriples = ragCtx.kagTriples();
 
             // Send sessionId first
             emitter.send(SseEmitter.event()
@@ -319,6 +321,18 @@ public class ChatService {
                                     emitter.send(SseEmitter.event()
                                             .name("sources")
                                             .data(toJson(finalSources)));
+                                }
+
+                                // KAG 结构化三元组（在 sources 之后、done 之前发送）
+                                // 已在 buildRagContext 阶段预计算，此处直接使用
+                                if (finalKagTriples != null && !finalKagTriples.isEmpty()) {
+                                    try {
+                                        emitter.send(SseEmitter.event()
+                                                .name("kag_sources")
+                                                .data(toJsonMap(finalKagTriples)));
+                                    } catch (Exception kagEx) {
+                                        log.warn("Failed to send kag_sources event", kagEx);
+                                    }
                                 }
 
                                 emitter.send(SseEmitter.event()
@@ -407,6 +421,9 @@ public class ChatService {
         String subgraph = knowledgeGraphService.querySubgraph(message, knowledgeBaseIds, tenantId);
         boolean hasSubgraph = subgraph != null && !subgraph.isBlank();
 
+        // KAG 结构化三元组（与子图同时获取，供 SSE kag_sources 事件使用）
+        List<Map<String, Object>> kagTriples = knowledgeGraphService.querySubgraphStructured(message, knowledgeBaseIds, tenantId);
+
         String augmentedPrompt;
         if (!recallSatisfied && !hasSubgraph) {
             // RAG 与 KAG 均无有效召回，不使用知识库内容，让大模型礼貌拒绝
@@ -451,7 +468,7 @@ public class ChatService {
                 })
                 .collect(Collectors.toList());
 
-        return new RagContext(augmentedPrompt, systemPrompt, sources);
+        return new RagContext(augmentedPrompt, systemPrompt, sources, kagTriples);
     }
 
     /**
@@ -581,6 +598,14 @@ public class ChatService {
     private String toJson(List<ChatResponse.SourceReference> sources) {
         try {
             return new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(sources);
+        } catch (Exception e) {
+            return "[]";
+        }
+    }
+
+    private String toJsonMap(List<Map<String, Object>> data) {
+        try {
+            return new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(data);
         } catch (Exception e) {
             return "[]";
         }

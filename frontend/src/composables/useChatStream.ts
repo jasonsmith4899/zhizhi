@@ -40,6 +40,7 @@ export function useChatStream() {
       role: 'assistant',
       content: '',
       sources: [],
+      kagSources: [],
       time: new Date(),
     })
 
@@ -61,6 +62,9 @@ export function useChatStream() {
           },
           onSources(sources) {
             messages.value[assistantIdx].sources = sources
+          },
+          onKagSources(kagSources) {
+            messages.value[assistantIdx].kagSources = kagSources
           },
           onDone() {
             loading.value = false

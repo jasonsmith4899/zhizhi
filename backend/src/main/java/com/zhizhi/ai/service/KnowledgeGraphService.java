@@ -176,6 +176,52 @@ public class KnowledgeGraphService {
         }
     }
 
+    /**
+     * 查询子图并返回结构化三元组列表（供 SSE kag_sources 使用）。
+     * 复用现有的实体识别 + 对齐 + 遍历逻辑。
+     */
+    public List<Map<String, Object>> querySubgraphStructured(String query, Set<Long> knowledgeBaseIds, Long tenantId) {
+        if (!enabled || query == null || query.isBlank() || knowledgeBaseIds.isEmpty()) return null;
+
+        try {
+            List<String> entityNames = recognizeEntities(query);
+            if (entityNames.isEmpty()) return null;
+
+            List<String> normNames = entityNames.stream()
+                    .map(this::normalize).filter(s -> !s.isBlank()).distinct().toList();
+            if (normNames.isEmpty()) return null;
+
+            List<Long> kbIds = new ArrayList<>(knowledgeBaseIds);
+            List<KgEntity> seeds = entityRepository
+                    .findByTenantIdAndKnowledgeBaseIdInAndNormNameIn(tenantId, kbIds, normNames);
+            if (seeds.isEmpty()) return null;
+
+            List<Long> seedIds = seeds.stream().map(KgEntity::getId).toList();
+            List<Object[]> rows = relationRepository.traverseSubgraph(
+                    seedIds, tenantId, kbIds, maxHops, maxSubgraphTriples);
+            if (rows.isEmpty()) return null;
+
+            List<Map<String, Object>> result = rows.stream()
+                    .map(r -> {
+                        Map<String, Object> map = new LinkedHashMap<>();
+                        map.put("sourceName", String.valueOf(r[0]));
+                        map.put("predicate", String.valueOf(r[1]));
+                        map.put("targetName", String.valueOf(r[2]));
+                        map.put("confidence", r.length > 3 ? r[3] : null);
+                        return map;
+                    })
+                    .distinct()
+                    .collect(Collectors.toList());
+
+            log.info("KAG 子图结构化召回: seeds={}, triples={}", seedIds.size(), result.size());
+            return result;
+
+        } catch (Exception e) {
+            log.warn("KAG 子图结构化查询失败(降级为纯RAG): {}", e.getMessage());
+            return null;
+        }
+    }
+
     /** 用 LLM 从 query 抽取实体名 */
     private List<String> recognizeEntities(String query) {
         try {

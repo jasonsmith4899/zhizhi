@@ -92,7 +92,9 @@ public class TenantController {
     public Result<Map<String, Object>> dashboard(@PathVariable Long id,
                                                   Authentication authentication) {
         Long userId = authUtil.getUserId(authentication);
-        tenantService.isMember(id, userId); // 权限检查
+        if (!tenantService.isMember(id, userId)) {
+            throw BusinessException.forbidden("无权操作");
+        }
         return Result.ok(statsService.getDashboard(id));
     }
 }

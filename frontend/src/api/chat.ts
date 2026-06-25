@@ -27,6 +27,7 @@ export async function sendMessageStream(
   callbacks: {
     onChunk: (text: string) => void
     onSources: (sources: any[]) => void
+    onKagSources?: (kagSources: any[]) => void
     onSession: (sessionId: string) => void
     onDone: () => void
     onError: (error: string) => void
@@ -83,6 +84,10 @@ export async function sendMessageStream(
             callbacks.onChunk(dataStr)
           } else if (currentEvent === 'sources') {
             callbacks.onSources(JSON.parse(dataStr))
+          } else if (currentEvent === 'kag_sources') {
+            try {
+              callbacks.onKagSources?.(JSON.parse(dataStr))
+            } catch { /* ignore parse errors */ }
           } else if (currentEvent === 'done') {
             callbacks.onDone()
           } else if (currentEvent === 'error') {

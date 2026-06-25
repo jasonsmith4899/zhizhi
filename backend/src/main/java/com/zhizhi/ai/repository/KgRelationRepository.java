@@ -1,6 +1,8 @@
 package com.zhizhi.ai.repository;
 
 import com.zhizhi.ai.model.entity.KgRelation;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -56,4 +58,31 @@ public interface KgRelationRepository extends JpaRepository<KgRelation, Long> {
     void deleteByTenantIdAndKnowledgeBaseId(Long tenantId, Long knowledgeBaseId);
 
     void deleteByKnowledgeBaseId(Long knowledgeBaseId);
+
+    // ==================== Controller 查询方法 ====================
+
+    /** 统计指定知识库的关系数量 */
+    @Query("SELECT COUNT(r) FROM KgRelation r WHERE r.tenantId = :tenantId AND r.knowledgeBaseId = :kbId")
+    long countByTenantIdAndKnowledgeBaseId(@Param("tenantId") Long tenantId, @Param("kbId") Long kbId);
+
+    /** 分页查询关系（带搜索和置信度筛选） */
+    @Query("SELECT r FROM KgRelation r WHERE r.tenantId = :tenantId AND r.knowledgeBaseId = :kbId " +
+           "AND (:search IS NULL OR r.predicate LIKE %:search% OR r.sourceId IN (SELECT e.id FROM KgEntity e WHERE e.name LIKE %:search%) OR r.targetId IN (SELECT e.id FROM KgEntity e WHERE e.name LIKE %:search%)) " +
+           "AND (:minConfidence IS NULL OR r.confidence >= :minConfidence) " +
+           "ORDER BY r.confidence DESC")
+    Page<KgRelation> searchRelations(@Param("tenantId") Long tenantId, @Param("kbId") Long kbId,
+                                      @Param("search") String search, @Param("minConfidence") Float minConfidence,
+                                      Pageable pageable);
+
+    /** 查询实体的直接关联关系 */
+    @Query("SELECT r FROM KgRelation r WHERE r.tenantId = :tenantId AND r.knowledgeBaseId = :kbId " +
+           "AND (r.sourceId = :entityId OR r.targetId = :entityId) ORDER BY r.confidence DESC")
+    List<KgRelation> findByEntityId(@Param("tenantId") Long tenantId, @Param("kbId") Long kbId,
+                                     @Param("entityId") Long entityId, Pageable pageable);
+
+    /** 子图数据：返回指定节点间的所有关系 */
+    @Query("SELECT r FROM KgRelation r WHERE r.tenantId = :tenantId AND r.knowledgeBaseId = :kbId " +
+           "AND (r.sourceId IN :nodeIds OR r.targetId IN :nodeIds)")
+    List<KgRelation> findByNodeIds(@Param("tenantId") Long tenantId, @Param("kbId") Long kbId,
+                                    @Param("nodeIds") List<Long> nodeIds);
 }

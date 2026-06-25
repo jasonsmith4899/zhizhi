@@ -138,12 +138,12 @@ public class RerankerService {
             }
         });
 
-        // 按分数降序排列
+        // 按分数降序排列并限制为 topK
         reranked.sort((a, b) -> Double.compare(
                 b.getScore() != null ? b.getScore() : 0,
                 a.getScore() != null ? a.getScore() : 0
         ));
 
-        return reranked;
+        return reranked.size() > topK ? new ArrayList<>(reranked.subList(0, topK)) : reranked;
     }
 }

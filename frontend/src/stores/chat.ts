@@ -6,6 +6,7 @@ interface Msg {
   role: string
   content: string
   sources?: any[]
+  kagSources?: any[]
   time: Date
 }
 

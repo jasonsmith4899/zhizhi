@@ -16,6 +16,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, WarningFilled, Upload, Download } from '@element-plus/icons-vue'
 import DocumentPreview from '../../components/knowledge/DocumentPreview.vue'
 import DocumentManageDialog from '../../components/knowledge/DocumentManageDialog.vue'
+import KgOverview from '../../components/kg/KgOverview.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -57,6 +58,10 @@ const batchDeleting = ref(false)
 onMounted(() => {
   loadKb()
   loadDocuments()
+  // 支持 URL 参数激活 tab
+  if (route.query.tab === 'knowledge-graph') {
+    activeTab.value = 'knowledge-graph'
+  }
 })
 
 async function loadKb() {
@@ -345,6 +350,11 @@ function needsReVectorize(doc: any): boolean {
 
           <el-empty v-if="!loading && documents.length === 0" description="暂无文档，请上传" />
         </el-card>
+      </el-tab-pane>
+
+      <!-- 知识图谱 Tab -->
+      <el-tab-pane label="知识图谱" name="knowledge-graph">
+        <KgOverview :kb-id="kbId" />
       </el-tab-pane>
 
     </el-tabs>

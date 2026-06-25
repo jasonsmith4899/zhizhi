@@ -1,9 +1,7 @@
 package com.zhizhi.ai.config;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
@@ -23,8 +21,6 @@ public class WebConfig implements WebMvcConfigurer {
                 .excludePathPatterns("/api/v1/auth/**", "/api/v1/health");
     }
 
-    @Bean
-    public RestTemplate restTemplate() {
-        return new RestTemplate();
-    }
+    // RestTemplate bean 统一由 AiConfig 提供（基于 RestTemplateBuilder，带默认超时配置），
+    // 此处不再重复定义，避免 BeanDefinitionOverrideException。
 }

@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * 分类（树形目录）管理
@@ -75,7 +76,7 @@ public class CategoryService {
     private void validateCategory(Long categoryId, Long knowledgeBaseId) {
         Category c = categoryRepository.findById(categoryId)
                 .orElseThrow(() -> BusinessException.notFound("分类"));
-        if (!c.getKnowledgeBaseId().equals(knowledgeBaseId)) {
+        if (!Objects.equals(c.getKnowledgeBaseId(), knowledgeBaseId)) {
             throw BusinessException.badRequest("分类不属于该知识库");
         }
     }

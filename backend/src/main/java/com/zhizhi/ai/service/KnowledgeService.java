@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Objects;
 
 @Slf4j
 @Service
@@ -47,10 +48,10 @@ public class KnowledgeService {
         Long tenantId = TenantContext.getTenantId();
         KnowledgeBase kb = knowledgeBaseRepository.findById(id)
                 .orElseThrow(() -> BusinessException.notFound("知识库"));
-        if (tenantId != null && !kb.getTenantId().equals(tenantId)) {
+        if (tenantId != null && !Objects.equals(kb.getTenantId(), tenantId)) {
             throw BusinessException.forbidden("无权访问此知识库");
         }
-        if (!kb.getUserId().equals(userId)) {
+        if (!Objects.equals(kb.getUserId(), userId)) {
             throw BusinessException.forbidden("无权访问此知识库");
         }
         return kb;

@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -69,7 +70,7 @@ public class DocumentService {
         // 验证知识库归属
         KnowledgeBase kb = knowledgeBaseRepository.findById(knowledgeBaseId)
                 .orElseThrow(() -> BusinessException.notFound("知识库"));
-        if (!kb.getUserId().equals(userId)) {
+        if (!Objects.equals(kb.getUserId(), userId)) {
             throw BusinessException.forbidden("无权操作此知识库");
         }
 
@@ -463,7 +464,7 @@ public class DocumentService {
     public List<Document> listByKnowledgeBase(Long knowledgeBaseId, Long userId) {
         KnowledgeBase kb = knowledgeBaseRepository.findById(knowledgeBaseId)
                 .orElseThrow(() -> BusinessException.notFound("知识库"));
-        if (!kb.getUserId().equals(userId)) {
+        if (!Objects.equals(kb.getUserId(), userId)) {
             throw BusinessException.forbidden("无权访问此知识库");
         }
         Long tenantId = TenantContext.getTenantId();
@@ -770,10 +771,10 @@ public class DocumentService {
             Document doc = documentRepository.findById(docId)
                     .orElseThrow(() -> BusinessException.notFound("文档"));
             KnowledgeBase kb = knowledgeBaseRepository.findById(doc.getKnowledgeBase().getId()).orElseThrow();
-            if (!kb.getUserId().equals(userId)) {
+            if (!Objects.equals(kb.getUserId(), userId)) {
                 throw BusinessException.forbidden("无权删除文档: " + doc.getFilename());
             }
-            if (tenantId != null && !doc.getTenantId().equals(tenantId)) {
+            if (tenantId != null && !Objects.equals(doc.getTenantId(), tenantId)) {
                 throw BusinessException.forbidden("无权删除文档: " + doc.getFilename());
             }
             if (kbId == null) {
@@ -810,11 +811,11 @@ public class DocumentService {
                 .orElseThrow(() -> BusinessException.notFound("文档"));
         KnowledgeBase kb = knowledgeBaseRepository.findById(doc.getKnowledgeBase().getId())
                 .orElseThrow(() -> BusinessException.notFound("知识库"));
-        if (!kb.getUserId().equals(userId)) {
+        if (!Objects.equals(kb.getUserId(), userId)) {
             throw BusinessException.forbidden("无权访问此文档");
         }
         Long tenantId = TenantContext.getTenantId();
-        if (tenantId != null && !doc.getTenantId().equals(tenantId)) {
+        if (tenantId != null && !Objects.equals(doc.getTenantId(), tenantId)) {
             throw BusinessException.forbidden("无权访问此文档");
         }
         return doc;

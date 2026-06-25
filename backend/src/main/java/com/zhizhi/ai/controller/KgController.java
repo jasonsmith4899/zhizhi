@@ -150,7 +150,7 @@ public class KgController {
                 .orElseThrow(() -> BusinessException.notFound("实体"));
 
         // 验证实体归属
-        if (!entity.getTenantId().equals(tenantId) || !entity.getKnowledgeBaseId().equals(kbId)) {
+        if (!Objects.equals(entity.getTenantId(), tenantId) || !Objects.equals(entity.getKnowledgeBaseId(), kbId)) {
             throw BusinessException.forbidden("无权访问该实体");
         }
 
@@ -221,7 +221,7 @@ public class KgController {
             KgEntity seed = entityRepository.findById(seedEntityId)
                     .orElseThrow(() -> BusinessException.notFound("种子实体"));
 
-            if (!seed.getTenantId().equals(tenantId) || !seed.getKnowledgeBaseId().equals(kbId)) {
+            if (!Objects.equals(seed.getTenantId(), tenantId) || !Objects.equals(seed.getKnowledgeBaseId(), kbId)) {
                 throw BusinessException.forbidden("无权访问该实体");
             }
 
@@ -337,7 +337,7 @@ public class KgController {
         // 校验知识库归属当前租户
         KnowledgeBase kb = knowledgeBaseRepository.findById(kbId)
                 .orElseThrow(() -> BusinessException.notFound("知识库"));
-        if (!kb.getTenantId().equals(tenantId)) {
+        if (!Objects.equals(kb.getTenantId(), tenantId)) {
             throw BusinessException.forbidden("无权访问此知识库");
         }
         return tenantId;

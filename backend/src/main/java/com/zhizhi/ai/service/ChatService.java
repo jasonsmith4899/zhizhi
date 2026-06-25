@@ -399,7 +399,7 @@ public class ChatService {
         for (Long kbId : knowledgeBaseIds) {
             var kb = knowledgeBaseRepository.findById(kbId)
                     .orElseThrow(() -> BusinessException.notFound("知识库"));
-            if (tenantId != null && !kb.getTenantId().equals(tenantId)) {
+            if (tenantId != null && !Objects.equals(kb.getTenantId(), tenantId)) {
                 throw BusinessException.forbidden("无权访问此知识库");
             }
         }
@@ -567,7 +567,7 @@ public class ChatService {
     public List<Message> getMessages(Long conversationId, Long userId) {
         Conversation conv = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> BusinessException.notFound("会话"));
-        if (!conv.getUserId().equals(userId)) {
+        if (!Objects.equals(conv.getUserId(), userId)) {
             throw BusinessException.forbidden("无权访问此会话");
         }
         Long tenantId = TenantContext.getTenantId();
@@ -585,11 +585,11 @@ public class ChatService {
     public void deleteConversation(Long conversationId, Long userId) {
         Conversation conv = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> BusinessException.notFound("会话"));
-        if (!conv.getUserId().equals(userId)) {
+        if (!Objects.equals(conv.getUserId(), userId)) {
             throw BusinessException.forbidden("无权删除此会话");
         }
         Long tenantId = TenantContext.getTenantId();
-        if (tenantId != null && !conv.getTenantId().equals(tenantId)) {
+        if (tenantId != null && !Objects.equals(conv.getTenantId(), tenantId)) {
             throw BusinessException.forbidden("无权删除此会话");
         }
         conversationRepository.delete(conv);

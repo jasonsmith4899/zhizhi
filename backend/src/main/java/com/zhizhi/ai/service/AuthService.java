@@ -165,7 +165,7 @@ public class AuthService {
         if (knowledgeBaseIds != null && !knowledgeBaseIds.isEmpty()) {
             List<KnowledgeBase> kbs = knowledgeBaseRepository.findAllById(knowledgeBaseIds);
             Set<KnowledgeBase> validKbs = kbs.stream()
-                    .filter(kb -> kb.getUserId().equals(userId))
+                    .filter(kb -> Objects.equals(kb.getUserId(), userId))
                     .collect(Collectors.toSet());
             apiKey.setKnowledgeBases(new HashSet<>(validKbs));
         }
@@ -187,7 +187,7 @@ public class AuthService {
         ApiKey apiKey = apiKeyRepository.findById(apiKeyId)
                 .orElseThrow(() -> BusinessException.notFound("API Key"));
 
-        if (!apiKey.getUserId().equals(userId)) {
+        if (!Objects.equals(apiKey.getUserId(), userId)) {
             throw BusinessException.forbidden("无权操作此 API Key");
         }
 
@@ -201,7 +201,7 @@ public class AuthService {
         if (knowledgeBaseIds != null) {
             List<KnowledgeBase> kbs = knowledgeBaseRepository.findAllById(knowledgeBaseIds);
             Set<KnowledgeBase> validKbs = kbs.stream()
-                    .filter(kb -> kb.getUserId().equals(userId))
+                    .filter(kb -> Objects.equals(kb.getUserId(), userId))
                     .collect(Collectors.toSet());
             apiKey.setKnowledgeBases(new HashSet<>(validKbs));
         }
@@ -218,7 +218,7 @@ public class AuthService {
         ApiKey apiKey = apiKeyRepository.findById(apiKeyId)
                 .orElseThrow(() -> BusinessException.notFound("API Key"));
 
-        if (!apiKey.getUserId().equals(userId)) {
+        if (!Objects.equals(apiKey.getUserId(), userId)) {
             throw BusinessException.forbidden("无权操作此 API Key");
         }
 

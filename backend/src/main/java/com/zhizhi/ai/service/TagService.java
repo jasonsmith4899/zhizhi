@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * 标签管理 + 文档标签关联
@@ -57,7 +58,7 @@ public class TagService {
         if (tagIds == null || tagIds.isEmpty()) return;
         for (Long tagId : tagIds.stream().distinct().toList()) {
             tagRepository.findById(tagId).ifPresent(tag -> {
-                if (tenantId != null && !tag.getTenantId().equals(tenantId)) {
+                if (tenantId != null && !Objects.equals(tag.getTenantId(), tenantId)) {
                     throw BusinessException.forbidden("无权使用此标签");
                 }
                 documentTagRepository.save(DocumentTag.builder()

@@ -175,4 +175,17 @@ class GlobalExceptionHandlerTest {
         assertEquals("系统内部错误，请稍后重试", response.getBody().getMessage());
         assertFalse(response.getBody().getMessage().contains("xyz"));
     }
+
+    @Test
+    @DisplayName("请求体不可解析（坏 JSON）返回 400 而非 500")
+    void handleNotReadableReturns400() {
+        var ex = new org.springframework.http.converter.HttpMessageNotReadableException(
+                "JSON parse error", new org.springframework.mock.http.MockHttpInputMessage(new byte[0]));
+
+        ResponseEntity<Result<Void>> response = handler.handleNotReadable(ex);
+
+        assertEquals(400, response.getStatusCode().value());
+        assertNotNull(response.getBody());
+        assertEquals("请求体格式错误", response.getBody().getMessage());
+    }
 }

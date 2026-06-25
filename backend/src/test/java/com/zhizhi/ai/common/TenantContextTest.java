@@ -4,9 +4,12 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import static org.assertj.core.api.Assertions.*;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicLong;
 
-@DisplayName("TenantContext 单元测试")
+import static org.junit.jupiter.api.Assertions.*;
+
+@DisplayName("TenantContext ThreadLocal 测试")
 class TenantContextTest {
 
     @AfterEach
@@ -15,49 +18,55 @@ class TenantContextTest {
     }
 
     @Test
-    @DisplayName("设置并获取租户ID")
+    @DisplayName("setTenantId 后 getTenantId 返回相同值")
     void setAndGet() {
         TenantContext.setTenantId(42L);
-        assertThat(TenantContext.getTenantId()).isEqualTo(42L);
+        assertEquals(42L, TenantContext.getTenantId());
     }
 
     @Test
-    @DisplayName("清除后返回null")
-    void clear() {
+    @DisplayName("未设置时 getTenantId 返回 null")
+    void get_beforeSet_returnsNull() {
+        assertNull(TenantContext.getTenantId());
+    }
+
+    @Test
+    @DisplayName("clear 后 getTenantId 返回 null")
+    void clear_removesValue() {
         TenantContext.setTenantId(1L);
         TenantContext.clear();
-        assertThat(TenantContext.getTenantId()).isNull();
+        assertNull(TenantContext.getTenantId());
     }
 
     @Test
-    @DisplayName("未设置时返回null")
-    void getWhenNotSet() {
-        assertThat(TenantContext.getTenantId()).isNull();
-    }
-
-    @Test
-    @DisplayName("覆盖设置")
-    void overwrite() {
+    @DisplayName("set 可覆盖之前的值")
+    void set_overwritesPrevious() {
         TenantContext.setTenantId(1L);
         TenantContext.setTenantId(2L);
-        assertThat(TenantContext.getTenantId()).isEqualTo(2L);
+        assertEquals(2L, TenantContext.getTenantId());
     }
 
     @Test
-    @DisplayName("线程隔离")
+    @DisplayName("不同线程的 TenantContext 互相隔离")
     void threadIsolation() throws InterruptedException {
-        TenantContext.setTenantId(1L);
+        TenantContext.setTenantId(100L);
+
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicLong otherThreadValue = new AtomicLong(-1);
 
         Thread otherThread = new Thread(() -> {
-            // 另一个线程应该看不到主线程的值
-            assertThat(TenantContext.getTenantId()).isNull();
-            TenantContext.setTenantId(99L);
-            assertThat(TenantContext.getTenantId()).isEqualTo(99L);
+            // 子线程未设置，应为 null
+            otherThreadValue.set(TenantContext.getTenantId() == null ? -1 : TenantContext.getTenantId());
+            TenantContext.setTenantId(200L);
+            otherThreadValue.set(TenantContext.getTenantId());
+            latch.countDown();
         });
         otherThread.start();
-        otherThread.join();
+        latch.await();
 
-        // 主线程的值不受影响
-        assertThat(TenantContext.getTenantId()).isEqualTo(1L);
+        // 子线程设置的值不影响主线程
+        assertEquals(100L, TenantContext.getTenantId());
+        // 子线程读到了自己设置的值
+        assertEquals(200L, otherThreadValue.get());
     }
 }

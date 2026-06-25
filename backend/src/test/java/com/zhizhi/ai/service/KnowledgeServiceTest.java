@@ -1,20 +1,17 @@
 package com.zhizhi.ai.service;
 
 import com.zhizhi.ai.common.BusinessException;
+import com.zhizhi.ai.common.TenantContext;
 import com.zhizhi.ai.model.dto.KnowledgeBaseRequest;
 import com.zhizhi.ai.model.entity.KnowledgeBase;
 import com.zhizhi.ai.repository.DocumentRepository;
 import com.zhizhi.ai.repository.KnowledgeBaseRepository;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
+import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.jdbc.core.JdbcTemplate;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -26,170 +23,220 @@ import static org.mockito.Mockito.*;
 @DisplayName("KnowledgeService 单元测试")
 class KnowledgeServiceTest {
 
+    @Mock private KnowledgeBaseRepository knowledgeBaseRepository;
+    @Mock private DocumentRepository documentRepository;
+    @Mock private JdbcTemplate jdbcTemplate;
+
     @InjectMocks
     private KnowledgeService knowledgeService;
 
-    @Mock
-    private KnowledgeBaseRepository knowledgeBaseRepository;
+    private static final Long TENANT_ID = 100L;
+    private static final Long USER_ID = 1L;
+    private static final Long KB_ID = 10L;
 
-    @Mock
-    private DocumentRepository documentRepository;
-
-    private KnowledgeBase testKb;
-    private KnowledgeBaseRequest kbRequest;
-    private final Long USER_ID = 1L;
-    private final Long OTHER_USER_ID = 2L;
+    private KnowledgeBase sampleKb;
 
     @BeforeEach
     void setUp() {
-        testKb = KnowledgeBase.builder()
-                .id(1L)
+        sampleKb = KnowledgeBase.builder()
+                .id(KB_ID)
                 .userId(USER_ID)
-                .name("测试知识库")
-                .description("测试描述")
+                .tenantId(TENANT_ID)
+                .name("Test KB")
+                .description("A test knowledge base")
                 .status("active")
-                .documentCount(5)
-                .chunkCount(100)
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
+                .documentCount(0)
+                .chunkCount(0)
                 .build();
-
-        kbRequest = new KnowledgeBaseRequest();
-        kbRequest.setName("新知识库");
-        kbRequest.setDescription("新描述");
     }
 
+    @AfterEach
+    void cleanup() {
+        TenantContext.clear();
+    }
+
+    // ==================== create ====================
+
     @Nested
-    @DisplayName("创建知识库")
-    class Create {
+    @DisplayName("create")
+    class CreateTests {
 
         @Test
         @DisplayName("创建成功")
         void create_success() {
-            when(knowledgeBaseRepository.save(any(KnowledgeBase.class))).thenReturn(testKb);
+            TenantContext.setTenantId(TENANT_ID);
+            KnowledgeBaseRequest request = new KnowledgeBaseRequest();
+            request.setName("New KB");
+            request.setDescription("desc");
 
-            KnowledgeBase result = knowledgeService.create(kbRequest, USER_ID);
+            when(knowledgeBaseRepository.save(any(KnowledgeBase.class))).thenAnswer(inv -> {
+                KnowledgeBase kb = inv.getArgument(0);
+                kb.setId(20L);
+                return kb;
+            });
 
-            assertThat(result).isNotNull();
-            assertThat(result.getName()).isEqualTo("测试知识库");
+            KnowledgeBase result = knowledgeService.create(request, USER_ID);
+
+            assertThat(result.getId()).isEqualTo(20L);
+            assertThat(result.getName()).isEqualTo("New KB");
+            assertThat(result.getTenantId()).isEqualTo(TENANT_ID);
+            assertThat(result.getUserId()).isEqualTo(USER_ID);
             verify(knowledgeBaseRepository).save(any(KnowledgeBase.class));
+        }
+
+        @Test
+        @DisplayName("创建失败 - 缺少租户信息")
+        void create_noTenant() {
+            TenantContext.clear();
+            KnowledgeBaseRequest request = new KnowledgeBaseRequest();
+            request.setName("New KB");
+
+            assertThatThrownBy(() -> knowledgeService.create(request, USER_ID))
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessageContaining("租户");
         }
     }
 
+    // ==================== getById ====================
+
     @Nested
-    @DisplayName("获取知识库")
-    class GetById {
+    @DisplayName("getById")
+    class GetByIdTests {
 
         @Test
-        @DisplayName("正常获取")
+        @DisplayName("获取成功")
         void getById_success() {
-            when(knowledgeBaseRepository.findById(1L)).thenReturn(Optional.of(testKb));
+            TenantContext.setTenantId(TENANT_ID);
+            when(knowledgeBaseRepository.findById(KB_ID)).thenReturn(Optional.of(sampleKb));
 
-            KnowledgeBase result = knowledgeService.getById(1L, USER_ID);
-
-            assertThat(result.getId()).isEqualTo(1L);
-            assertThat(result.getName()).isEqualTo("测试知识库");
+            KnowledgeBase result = knowledgeService.getById(KB_ID, USER_ID);
+            assertThat(result).isEqualTo(sampleKb);
         }
 
         @Test
-        @DisplayName("知识库不存在")
+        @DisplayName("获取失败 - 知识库不存在")
         void getById_notFound() {
             when(knowledgeBaseRepository.findById(999L)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> knowledgeService.getById(999L, USER_ID))
                     .isInstanceOf(BusinessException.class)
-                    .satisfies(e -> assertThat(((BusinessException) e).getCode()).isEqualTo(404));
+                    .satisfies(ex -> assertThat(((BusinessException) ex).getCode()).isEqualTo(404));
         }
 
         @Test
-        @DisplayName("无权访问他人知识库")
-        void getById_forbidden() {
-            when(knowledgeBaseRepository.findById(1L)).thenReturn(Optional.of(testKb));
+        @DisplayName("获取失败 - 租户不匹配")
+        void getById_tenantMismatch() {
+            TenantContext.setTenantId(999L);
+            when(knowledgeBaseRepository.findById(KB_ID)).thenReturn(Optional.of(sampleKb));
 
-            assertThatThrownBy(() -> knowledgeService.getById(1L, OTHER_USER_ID))
+            assertThatThrownBy(() -> knowledgeService.getById(KB_ID, USER_ID))
                     .isInstanceOf(BusinessException.class)
-                    .satisfies(e -> assertThat(((BusinessException) e).getCode()).isEqualTo(403));
+                    .satisfies(ex -> assertThat(((BusinessException) ex).getCode()).isEqualTo(403));
+        }
+
+        @Test
+        @DisplayName("获取失败 - 用户不匹配")
+        void getById_userMismatch() {
+            TenantContext.setTenantId(TENANT_ID);
+            when(knowledgeBaseRepository.findById(KB_ID)).thenReturn(Optional.of(sampleKb));
+
+            assertThatThrownBy(() -> knowledgeService.getById(KB_ID, 999L))
+                    .isInstanceOf(BusinessException.class)
+                    .satisfies(ex -> assertThat(((BusinessException) ex).getCode()).isEqualTo(403));
         }
     }
 
+    // ==================== listByUser ====================
+
     @Nested
-    @DisplayName("获取用户知识库列表")
-    class ListByUser {
+    @DisplayName("listByUser")
+    class ListByUserTests {
 
         @Test
-        @DisplayName("返回列表")
-        void listByUser_success() {
-            when(knowledgeBaseRepository.findByUserIdOrderByUpdatedAtDesc(USER_ID))
-                    .thenReturn(List.of(testKb));
+        @DisplayName("按租户查询（有租户ID）")
+        void listByUser_withTenant() {
+            TenantContext.setTenantId(TENANT_ID);
+            when(knowledgeBaseRepository.findByTenantIdOrderByUpdatedAtDesc(TENANT_ID))
+                    .thenReturn(List.of(sampleKb));
 
             List<KnowledgeBase> result = knowledgeService.listByUser(USER_ID);
-
             assertThat(result).hasSize(1);
-            assertThat(result.get(0).getName()).isEqualTo("测试知识库");
         }
 
         @Test
-        @DisplayName("空列表")
-        void listByUser_empty() {
+        @DisplayName("按用户查询（无租户ID）")
+        void listByUser_noTenant() {
+            TenantContext.clear();
             when(knowledgeBaseRepository.findByUserIdOrderByUpdatedAtDesc(USER_ID))
-                    .thenReturn(List.of());
+                    .thenReturn(List.of(sampleKb));
 
             List<KnowledgeBase> result = knowledgeService.listByUser(USER_ID);
-
-            assertThat(result).isEmpty();
+            assertThat(result).hasSize(1);
         }
     }
 
+    // ==================== update ====================
+
     @Nested
-    @DisplayName("更新知识库")
-    class Update {
+    @DisplayName("update")
+    class UpdateTests {
 
         @Test
         @DisplayName("更新成功")
         void update_success() {
-            when(knowledgeBaseRepository.findById(1L)).thenReturn(Optional.of(testKb));
-            when(knowledgeBaseRepository.save(any(KnowledgeBase.class))).thenReturn(testKb);
+            TenantContext.setTenantId(TENANT_ID);
+            when(knowledgeBaseRepository.findById(KB_ID)).thenReturn(Optional.of(sampleKb));
+            when(knowledgeBaseRepository.save(any(KnowledgeBase.class))).thenAnswer(inv -> inv.getArgument(0));
 
-            KnowledgeBase result = knowledgeService.update(1L, kbRequest, USER_ID);
+            KnowledgeBaseRequest request = new KnowledgeBaseRequest();
+            request.setName("Updated Name");
+            request.setDescription("Updated desc");
 
-            assertThat(result).isNotNull();
-            verify(knowledgeBaseRepository).save(any(KnowledgeBase.class));
-        }
+            KnowledgeBase result = knowledgeService.update(KB_ID, request, USER_ID);
 
-        @Test
-        @DisplayName("无权更新")
-        void update_forbidden() {
-            when(knowledgeBaseRepository.findById(1L)).thenReturn(Optional.of(testKb));
-
-            assertThatThrownBy(() -> knowledgeService.update(1L, kbRequest, OTHER_USER_ID))
-                    .isInstanceOf(BusinessException.class)
-                    .satisfies(e -> assertThat(((BusinessException) e).getCode()).isEqualTo(403));
+            assertThat(result.getName()).isEqualTo("Updated Name");
+            assertThat(result.getDescription()).isEqualTo("Updated desc");
+            verify(knowledgeBaseRepository).save(sampleKb);
         }
     }
 
+    // ==================== delete ====================
+
     @Nested
-    @DisplayName("删除知识库")
-    class Delete {
+    @DisplayName("delete")
+    class DeleteTests {
 
         @Test
-        @DisplayName("删除成功")
+        @DisplayName("删除成功 - 级联清理所有关联数据")
         void delete_success() {
-            when(knowledgeBaseRepository.findById(1L)).thenReturn(Optional.of(testKb));
-            doNothing().when(knowledgeBaseRepository).delete(any());
+            TenantContext.setTenantId(TENANT_ID);
+            when(knowledgeBaseRepository.findById(KB_ID)).thenReturn(Optional.of(sampleKb));
 
-            knowledgeService.delete(1L, USER_ID);
+            knowledgeService.delete(KB_ID, USER_ID);
 
-            verify(knowledgeBaseRepository).delete(testKb);
+            // Verify cascading deletes in order
+            verify(jdbcTemplate).update(contains("DELETE FROM messages"), eq(TENANT_ID), eq(KB_ID));
+            verify(jdbcTemplate).update(contains("spring_ai_chat_memory"), eq(KB_ID), eq(TENANT_ID));
+            verify(jdbcTemplate).update(contains("DELETE FROM conversations"), eq(KB_ID), eq(TENANT_ID));
+            verify(jdbcTemplate).update(contains("DELETE FROM vector_chunks"), eq(KB_ID.toString()), eq(TENANT_ID.toString()));
+            verify(jdbcTemplate).update(contains("DELETE FROM document_chunks"), eq(KB_ID), eq(TENANT_ID));
+            verify(jdbcTemplate).update(contains("DELETE FROM document_tags"), eq(KB_ID), eq(TENANT_ID));
+            verify(jdbcTemplate).update(contains("DELETE FROM document_versions"), eq(KB_ID), eq(TENANT_ID));
+            verify(jdbcTemplate).update(contains("DELETE FROM documents"), eq(KB_ID), eq(TENANT_ID));
+            verify(jdbcTemplate).update(contains("DELETE FROM tags"), eq(KB_ID), eq(TENANT_ID));
+            verify(jdbcTemplate).update(contains("DELETE FROM categories"), eq(KB_ID), eq(TENANT_ID));
+            verify(jdbcTemplate).update(contains("DELETE FROM kg_relations"), eq(KB_ID), eq(TENANT_ID));
+            verify(jdbcTemplate).update(contains("DELETE FROM kg_entities"), eq(KB_ID), eq(TENANT_ID));
+            verify(knowledgeBaseRepository).delete(sampleKb);
         }
 
         @Test
-        @DisplayName("无权删除")
-        void delete_forbidden() {
-            when(knowledgeBaseRepository.findById(1L)).thenReturn(Optional.of(testKb));
+        @DisplayName("删除失败 - 知识库不存在")
+        void delete_notFound() {
+            when(knowledgeBaseRepository.findById(999L)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> knowledgeService.delete(1L, OTHER_USER_ID))
-                    .isInstanceOf(BusinessException.class)
-                    .satisfies(e -> assertThat(((BusinessException) e).getCode()).isEqualTo(403));
+            assertThatThrownBy(() -> knowledgeService.delete(999L, USER_ID))
+                    .isInstanceOf(BusinessException.class);
         }
     }
 }

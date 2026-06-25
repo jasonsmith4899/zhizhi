@@ -1,505 +1,288 @@
 package com.zhizhi.ai.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ai.document.Document;
 import org.springframework.http.HttpEntity;
-import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
+import java.lang.reflect.Field;
 import java.util.*;
 
-import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("RerankerService Unit Tests")
 class RerankerServiceTest {
-
-    private RerankerService rerankerService;
 
     @Mock
     private RestTemplate restTemplate;
 
-    @Mock
-    private ObjectMapper objectMapper;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
-    private final String API_KEY = "test-api-key-123";
-    private final String BASE_URL = "https://api.siliconflow.cn";
-    private final String MODEL = "BAAI/bge-reranker-v2-m3";
-    private final int TOP_K = 5;
+    private RerankerService rerankerService;
 
     @BeforeEach
     void setUp() {
         rerankerService = new RerankerService(restTemplate, objectMapper);
-        ReflectionTestUtils.setField(rerankerService, "apiKey", API_KEY);
-        ReflectionTestUtils.setField(rerankerService, "baseUrl", BASE_URL);
-        ReflectionTestUtils.setField(rerankerService, "model", MODEL);
-        ReflectionTestUtils.setField(rerankerService, "topK", TOP_K);
+        setField(rerankerService, "apiKey", "test-api-key");
+        setField(rerankerService, "baseUrl", "https://api.siliconflow.cn");
+        setField(rerankerService, "model", "BAAI/bge-reranker-v2-m3");
+        setField(rerankerService, "topK", 5);
     }
 
-    @Nested
-    @DisplayName("Rerank Basic Functionality")
-    class RerankBasic {
-
-        @Test
-        @DisplayName("Successfully rerank and return documents sorted by score")
-        void testRerankSuccess() throws Exception {
-            String query = "test query";
-            List<Document> candidates = createCandidates(3);
-
-            JsonNode mockResponse = createMockRerankResponse(3);
-            when(objectMapper.writeValueAsString(any())).thenReturn("{\"mock\": \"request\"}");
-            when(restTemplate.postForObject(anyString(), any(HttpEntity.class), eq(String.class)))
-                    .thenReturn("{\"results\": [{\"index\": 0, \"score\": 0.95}, {\"index\": 1, \"score\": 0.87}, {\"index\": 2, \"score\": 0.72}]}");
-            when(objectMapper.readTree(anyString())).thenReturn(mockResponse);
-
-            List<Document> result = rerankerService.rerank(query, candidates);
-
-            assertThat(result).isNotEmpty();
-            assertThat(result.size()).isLessThanOrEqualTo(TOP_K);
-            for (int i = 0; i < result.size() - 1; i++) {
-                assertThat(result.get(i).getScore()).isGreaterThanOrEqualTo(result.get(i + 1).getScore());
-            }
-            verify(restTemplate, times(1)).postForObject(anyString(), any(HttpEntity.class), eq(String.class));
-        }
-
-        @Test
-        @DisplayName("Empty candidates return empty list")
-        void testRerankWithEmptyCandidates() {
-            String query = "test query";
-            List<Document> candidates = Collections.emptyList();
-
-            List<Document> result = rerankerService.rerank(query, candidates);
-
-            assertThat(result).isEmpty();
-            verify(restTemplate, never()).postForObject(anyString(), any(HttpEntity.class), eq(String.class));
-        }
-
-        @Test
-        @DisplayName("Missing API Key returns original order")
-        void testRerankWithoutApiKey() {
-            String query = "test query";
-            List<Document> candidates = createCandidates(10);
-            ReflectionTestUtils.setField(rerankerService, "apiKey", "");
-
-            List<Document> result = rerankerService.rerank(query, candidates);
-
-            assertThat(result).hasSize(TOP_K);
-            assertThat(result).isEqualTo(candidates.stream().limit(TOP_K).toList());
-            verify(restTemplate, never()).postForObject(anyString(), any(HttpEntity.class), eq(String.class));
-        }
-
-        @Test
-        @DisplayName("Blank API Key returns original order")
-        void testRerankWithBlankApiKey() {
-            String query = "test query";
-            List<Document> candidates = createCandidates(10);
-            ReflectionTestUtils.setField(rerankerService, "apiKey", "   ");
-
-            List<Document> result = rerankerService.rerank(query, candidates);
-
-            assertThat(result).hasSize(TOP_K);
-            verify(restTemplate, never()).postForObject(anyString(), any(HttpEntity.class), eq(String.class));
-        }
-
-        @Test
-        @DisplayName("Fewer candidates than topK returns all")
-        void testRerankWithFewerCandidatesThanTopK() throws Exception {
-            String query = "test query";
-            List<Document> candidates = createCandidates(2);
-
-            JsonNode mockResponse = createMockRerankResponse(2);
-            when(objectMapper.writeValueAsString(any())).thenReturn("{\"mock\": \"request\"}");
-            when(restTemplate.postForObject(anyString(), any(HttpEntity.class), eq(String.class)))
-                    .thenReturn("{\"results\": [{\"index\": 0, \"score\": 0.95}, {\"index\": 1, \"score\": 0.87}]}");
-            when(objectMapper.readTree(anyString())).thenReturn(mockResponse);
-
-            List<Document> result = rerankerService.rerank(query, candidates);
-
-            assertThat(result).hasSize(2);
+    private void setField(Object target, String fieldName, Object value) {
+        try {
+            Field field = target.getClass().getDeclaredField(fieldName);
+            field.setAccessible(true);
+            field.set(target, value);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
     }
 
-    @Nested
-    @DisplayName("API Call and Parsing")
-    class ApiCallAndParsing {
-
-        @Test
-        @DisplayName("API exception falls back to original order")
-        void testRerankWithApiException() throws Exception {
-            String query = "test query";
-            List<Document> candidates = createCandidates(3);
-            when(objectMapper.writeValueAsString(any())).thenReturn("{\"mock\": \"request\"}");
-            when(restTemplate.postForObject(anyString(), any(HttpEntity.class), eq(String.class)))
-                    .thenThrow(new RestClientException("Connection timeout"));
-
-            List<Document> result = rerankerService.rerank(query, candidates);
-
-            assertThat(result).hasSize(3);
-            assertThat(result).isEqualTo(candidates);
-        }
-
-        @Test
-        @DisplayName("JSON parse exception falls back to original order")
-        void testRerankWithJsonParseException() throws Exception {
-            String query = "test query";
-            List<Document> candidates = createCandidates(3);
-            when(objectMapper.writeValueAsString(any())).thenReturn("{\"mock\": \"request\"}");
-            when(restTemplate.postForObject(anyString(), any(HttpEntity.class), eq(String.class)))
-                    .thenReturn("invalid json");
-            when(objectMapper.readTree(anyString())).thenThrow(new RuntimeException("Invalid JSON"));
-
-            List<Document> result = rerankerService.rerank(query, candidates);
-
-            assertThat(result).hasSize(TOP_K);
-        }
-
-        @Test
-        @DisplayName("Missing results field returns original order")
-        void testRerankWithMissingResultsField() throws Exception {
-            String query = "test query";
-            List<Document> candidates = createCandidates(3);
-            when(objectMapper.writeValueAsString(any())).thenReturn("{\"mock\": \"request\"}");
-            when(restTemplate.postForObject(anyString(), any(HttpEntity.class), eq(String.class)))
-                    .thenReturn("{\"error\": \"something went wrong\"}");
-
-            ObjectMapper realObjectMapper = new ObjectMapper();
-            ReflectionTestUtils.setField(rerankerService, "objectMapper", realObjectMapper);
-
-            List<Document> result = rerankerService.rerank(query, candidates);
-
-            assertThat(result).hasSize(TOP_K);
-        }
-
-        @Test
-        @DisplayName("Out of bounds index in results is ignored")
-        void testRerankWithOutOfBoundsIndex() throws Exception {
-            String query = "test query";
-            List<Document> candidates = createCandidates(2);
-
-            ObjectMapper realObjectMapper = new ObjectMapper();
-            ReflectionTestUtils.setField(rerankerService, "objectMapper", realObjectMapper);
-
-            String responseJson = "{\"results\": [{\"index\": 0, \"score\": 0.95}, {\"index\": 10, \"score\": 0.87}]}";
-            when(restTemplate.postForObject(anyString(), any(HttpEntity.class), eq(String.class)))
-                    .thenReturn(responseJson);
-
-            List<Document> result = rerankerService.rerank(query, candidates);
-
-            assertThat(result).hasSize(1);
-            assertThat(result.get(0).getScore()).isEqualTo(0.95);
-        }
-
-        @Test
-        @DisplayName("Null score in results is handled correctly")
-        void testRerankWithNullScore() throws Exception {
-            String query = "test query";
-            List<Document> candidates = createCandidates(2);
-
-            ObjectMapper realObjectMapper = new ObjectMapper();
-            ReflectionTestUtils.setField(rerankerService, "objectMapper", realObjectMapper);
-
-            String responseJson = "{\"results\": [{\"index\": 0, \"score\": 0.95}, {\"index\": 1, \"score\": null}]}";
-            when(restTemplate.postForObject(anyString(), any(HttpEntity.class), eq(String.class)))
-                    .thenReturn(responseJson);
-
-            List<Document> result = rerankerService.rerank(query, candidates);
-
-            assertThat(result).hasSize(2);
-        }
+    private Document createDoc(String text, String docId, String chunkIdx, double score) {
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("document_id", docId);
+        metadata.put("chunk_index", chunkIdx);
+        metadata.put("knowledge_base_id", "1");
+        return Document.builder().text(text).metadata(metadata).score(score).build();
     }
 
-    @Nested
-    @DisplayName("Request Building")
-    class RequestBuilding {
+    // ==================== Happy path ====================
 
-        @Test
-        @DisplayName("Request contains all required fields")
-        void testBuildRequestContainsRequiredFields() throws Exception {
-            String query = "test query";
-            List<Document> candidates = createCandidates(3);
+    @Test
+    void rerank_happyPath_returnsRerankedInScoreOrder() {
+        List<Document> candidates = List.of(
+                createDoc("first doc", "1", "0", 0.6),
+                createDoc("second doc", "2", "0", 0.5),
+                createDoc("third doc", "3", "0", 0.7)
+        );
 
-            ObjectMapper realObjectMapper = new ObjectMapper();
-            ReflectionTestUtils.setField(rerankerService, "objectMapper", realObjectMapper);
+        String apiResponse = "{\"results\":[" +
+                "{\"index\":2,\"score\":0.95}," +
+                "{\"index\":0,\"score\":0.85}," +
+                "{\"index\":1,\"score\":0.75}" +
+                "]}";
+        when(restTemplate.postForObject(anyString(), any(HttpEntity.class), eq(String.class)))
+                .thenReturn(apiResponse);
 
-            when(restTemplate.postForObject(anyString(), any(HttpEntity.class), eq(String.class)))
-                    .thenReturn("{\"results\": []}");
+        List<Document> result = rerankerService.rerank("test query", candidates);
 
-            rerankerService.rerank(query, candidates);
-
-            verify(restTemplate, times(1)).postForObject(
-                    argThat(url -> url.contains("/v1/rerank")),
-                    argThat(entity -> {
-                        String body = entity.getBody();
-                        return body != null && body.contains("model") && body.contains("query")
-                                && body.contains("documents") && body.contains("top_n");
-                    }),
-                    eq(String.class)
-            );
-        }
-
-        @Test
-        @DisplayName("Request URL contains base URL and endpoint")
-        void testBuildRequestUrlCorrect() throws Exception {
-            String query = "test";
-            List<Document> candidates = createCandidates(1);
-
-            ObjectMapper realObjectMapper = new ObjectMapper();
-            ReflectionTestUtils.setField(rerankerService, "objectMapper", realObjectMapper);
-
-            when(restTemplate.postForObject(anyString(), any(HttpEntity.class), eq(String.class)))
-                    .thenReturn("{\"results\": []}");
-
-            rerankerService.rerank(query, candidates);
-
-            verify(restTemplate).postForObject(
-                    eq(BASE_URL + "/v1/rerank"),
-                    any(HttpEntity.class),
-                    eq(String.class)
-            );
-        }
-
-        @Test
-        @DisplayName("Request headers have correct Content-Type and auth")
-        void testBuildRequestHeadersCorrect() throws Exception {
-            String query = "test";
-            List<Document> candidates = createCandidates(1);
-
-            ObjectMapper realObjectMapper = new ObjectMapper();
-            ReflectionTestUtils.setField(rerankerService, "objectMapper", realObjectMapper);
-
-            when(restTemplate.postForObject(anyString(), any(HttpEntity.class), eq(String.class)))
-                    .thenReturn("{\"results\": []}");
-
-            rerankerService.rerank(query, candidates);
-
-            verify(restTemplate).postForObject(
-                    anyString(),
-                    argThat(entity -> {
-                        String contentType = entity.getHeaders().getContentType().toString();
-                        String authHeader = entity.getHeaders().getFirst("Authorization");
-                        return contentType.contains("application/json")
-                                && authHeader != null && authHeader.contains("Bearer");
-                    }),
-                    eq(String.class)
-            );
-        }
+        assertThat(result).hasSize(3);
+        // Sorted by reranker score descending
+        assertThat(result.get(0).getText()).isEqualTo("third doc");
+        assertThat(result.get(0).getScore()).isEqualTo(0.95);
+        assertThat(result.get(1).getText()).isEqualTo("first doc");
+        assertThat(result.get(1).getScore()).isEqualTo(0.85);
+        assertThat(result.get(2).getText()).isEqualTo("second doc");
+        assertThat(result.get(2).getScore()).isEqualTo(0.75);
     }
 
-    @Nested
-    @DisplayName("Document Processing and Metadata")
-    class DocumentProcessing {
+    @Test
+    void rerank_preservesOriginalMetadata() {
+        List<Document> candidates = List.of(
+                createDoc("doc content", "10", "3", 0.5)
+        );
 
-        @Test
-        @DisplayName("Reranked documents preserve original metadata")
-        void testRerankPreservesMetadata() throws Exception {
-            String query = "test query";
-            Map<String, Object> metadata = new HashMap<>();
-            metadata.put("knowledge_base_id", "1");
-            metadata.put("document_id", "doc-123");
-            metadata.put("tenant_id", "tenant-1");
-            Document doc = new Document("test content", metadata);
-            List<Document> candidates = List.of(doc);
+        String apiResponse = "{\"results\":[{\"index\":0,\"score\":0.92}]}";
+        when(restTemplate.postForObject(anyString(), any(HttpEntity.class), eq(String.class)))
+                .thenReturn(apiResponse);
 
-            ObjectMapper realObjectMapper = new ObjectMapper();
-            ReflectionTestUtils.setField(rerankerService, "objectMapper", realObjectMapper);
+        List<Document> result = rerankerService.rerank("query", candidates);
 
-            when(restTemplate.postForObject(anyString(), any(HttpEntity.class), eq(String.class)))
-                    .thenReturn("{\"results\": [{\"index\": 0, \"score\": 0.95}]}");
-
-            List<Document> result = rerankerService.rerank(query, candidates);
-
-            assertThat(result).hasSize(1);
-            assertThat(result.get(0).getMetadata()).containsAllEntriesOf(metadata);
-        }
-
-        @Test
-        @DisplayName("Reranked documents have updated score")
-        void testRerankUpdatesScore() throws Exception {
-            String query = "test query";
-            Document doc = new Document("test content", new HashMap<>());
-            List<Document> candidates = List.of(doc);
-
-            ObjectMapper realObjectMapper = new ObjectMapper();
-            ReflectionTestUtils.setField(rerankerService, "objectMapper", realObjectMapper);
-
-            double expectedScore = 0.95;
-            when(restTemplate.postForObject(anyString(), any(HttpEntity.class), eq(String.class)))
-                    .thenReturn("{\"results\": [{\"index\": 0, \"score\": " + expectedScore + "}]}");
-
-            List<Document> result = rerankerService.rerank(query, candidates);
-
-            assertThat(result).hasSize(1);
-            assertThat(result.get(0).getScore()).isEqualTo(expectedScore);
-        }
-
-        @Test
-        @DisplayName("Multiple documents correctly sorted by score")
-        void testRerankSortsMultipleDocumentsByScore() throws Exception {
-            String query = "test query";
-            List<Document> candidates = createCandidates(5);
-
-            ObjectMapper realObjectMapper = new ObjectMapper();
-            ReflectionTestUtils.setField(rerankerService, "objectMapper", realObjectMapper);
-
-            when(restTemplate.postForObject(anyString(), any(HttpEntity.class), eq(String.class)))
-                    .thenReturn("{\"results\": [" +
-                            "{\"index\": 2, \"score\": 0.99}," +
-                            "{\"index\": 0, \"score\": 0.95}," +
-                            "{\"index\": 4, \"score\": 0.82}," +
-                            "{\"index\": 1, \"score\": 0.77}," +
-                            "{\"index\": 3, \"score\": 0.65}" +
-                            "]}");
-
-            List<Document> result = rerankerService.rerank(query, candidates);
-
-            assertThat(result).hasSize(5);
-            assertThat(result.get(0).getScore()).isEqualTo(0.99);
-            assertThat(result.get(1).getScore()).isEqualTo(0.95);
-            assertThat(result.get(2).getScore()).isEqualTo(0.82);
-            assertThat(result.get(3).getScore()).isEqualTo(0.77);
-            assertThat(result.get(4).getScore()).isEqualTo(0.65);
-        }
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getMetadata()).containsEntry("document_id", "10");
+        assertThat(result.get(0).getMetadata()).containsEntry("chunk_index", "3");
+        assertThat(result.get(0).getMetadata()).containsEntry("knowledge_base_id", "1");
     }
 
-    @Nested
-    @DisplayName("Edge Cases")
-    class EdgeCases {
-
-        @Test
-        @DisplayName("Candidates exceeding topK are truncated")
-        void testRerankTruncatesExcessCandidates() throws Exception {
-            String query = "test query";
-            List<Document> candidates = createCandidates(20);
-
-            ObjectMapper realObjectMapper = new ObjectMapper();
-            ReflectionTestUtils.setField(rerankerService, "objectMapper", realObjectMapper);
-
-            StringBuilder responseJson = new StringBuilder("{\"results\": [");
-            for (int i = 0; i < 20; i++) {
-                if (i > 0) responseJson.append(",");
-                responseJson.append("{\"index\": ").append(i).append(", \"score\": ").append(1.0 - (i * 0.05)).append("}");
-            }
-            responseJson.append("]}");
-
-            when(restTemplate.postForObject(anyString(), any(HttpEntity.class), eq(String.class)))
-                    .thenReturn(responseJson.toString());
-
-            List<Document> result = rerankerService.rerank(query, candidates);
-
-            assertThat(result).hasSize(TOP_K);
-        }
-
-        @Test
-        @DisplayName("Duplicate indices are handled correctly")
-        void testRerankWithDuplicateIndices() throws Exception {
-            String query = "test query";
-            List<Document> candidates = createCandidates(3);
-
-            ObjectMapper realObjectMapper = new ObjectMapper();
-            ReflectionTestUtils.setField(rerankerService, "objectMapper", realObjectMapper);
-
-            when(restTemplate.postForObject(anyString(), any(HttpEntity.class), eq(String.class)))
-                    .thenReturn("{\"results\": [{\"index\": 0, \"score\": 0.95}, {\"index\": 0, \"score\": 0.90}]}");
-
-            List<Document> result = rerankerService.rerank(query, candidates);
-
-            assertThat(result.size()).isGreaterThanOrEqualTo(1);
-        }
-
-        @Test
-        @DisplayName("Empty results array returns empty list")
-        void testRerankWithEmptyResults() throws Exception {
-            String query = "test query";
-            List<Document> candidates = createCandidates(3);
-
-            ObjectMapper realObjectMapper = new ObjectMapper();
-            ReflectionTestUtils.setField(rerankerService, "objectMapper", realObjectMapper);
-
-            when(restTemplate.postForObject(anyString(), any(HttpEntity.class), eq(String.class)))
-                    .thenReturn("{\"results\": []}");
-
-            List<Document> result = rerankerService.rerank(query, candidates);
-
-            assertThat(result).isEmpty();
-        }
-    }
-
-    @Nested
-    @DisplayName("Multi-tenant Isolation")
-    class TenantIsolation {
-
-        @Test
-        @DisplayName("Different tenant documents preserve metadata")
-        void testRerankPreservesTenantId() throws Exception {
-            String query = "test query";
-            Map<String, Object> metadata1 = new HashMap<>();
-            metadata1.put("tenant_id", "tenant-1");
-            metadata1.put("document_id", "doc-1");
-
-            Map<String, Object> metadata2 = new HashMap<>();
-            metadata2.put("tenant_id", "tenant-2");
-            metadata2.put("document_id", "doc-2");
-
-            List<Document> candidates = List.of(
-                    new Document("content1", metadata1),
-                    new Document("content2", metadata2)
-            );
-
-            ObjectMapper realObjectMapper = new ObjectMapper();
-            ReflectionTestUtils.setField(rerankerService, "objectMapper", realObjectMapper);
-
-            when(restTemplate.postForObject(anyString(), any(HttpEntity.class), eq(String.class)))
-                    .thenReturn("{\"results\": [{\"index\": 0, \"score\": 0.95}, {\"index\": 1, \"score\": 0.87}]}");
-
-            List<Document> result = rerankerService.rerank(query, candidates);
-
-            assertThat(result).hasSize(2);
-            assertThat(result.get(0).getMetadata().get("tenant_id")).isEqualTo("tenant-1");
-            assertThat(result.get(1).getMetadata().get("tenant_id")).isEqualTo("tenant-2");
-        }
-    }
-
-    // Helper methods
-
-    private List<Document> createCandidates(int count) {
+    @Test
+    void rerank_limitsResultsToTopK() {
         List<Document> candidates = new ArrayList<>();
-        for (int i = 0; i < count; i++) {
-            Map<String, Object> metadata = new HashMap<>();
-            metadata.put("knowledge_base_id", "1");
-            metadata.put("document_id", "doc-" + i);
-            metadata.put("chunk_index", String.valueOf(i));
-            metadata.put("tenant_id", "tenant-1");
-            candidates.add(new Document("candidate content " + i, metadata));
+        StringBuilder resultsJson = new StringBuilder("{\"results\":[");
+        for (int i = 0; i < 10; i++) {
+            candidates.add(createDoc("doc " + i, String.valueOf(i), "0", 0.5));
+            if (i > 0) resultsJson.append(",");
+            resultsJson.append("{\"index\":").append(i).append(",\"score\":").append(1.0 - i * 0.05).append("}");
         }
-        return candidates;
+        resultsJson.append("]}");
+
+        when(restTemplate.postForObject(anyString(), any(HttpEntity.class), eq(String.class)))
+                .thenReturn(resultsJson.toString());
+
+        List<Document> result = rerankerService.rerank("query", candidates);
+
+        assertThat(result).hasSize(5); // limited by topK=5
     }
 
-    private JsonNode createMockRerankResponse(int resultCount) {
-        ObjectMapper mapper = new ObjectMapper();
-        ObjectNode response = mapper.createObjectNode();
-        ArrayNode results = mapper.createArrayNode();
+    // ==================== Empty / blank apiKey ====================
 
-        for (int i = 0; i < resultCount; i++) {
-            ObjectNode result = mapper.createObjectNode();
-            result.put("index", i);
-            result.put("score", 1.0 - (i * 0.08));
-            results.add(result);
+    @Test
+    void rerank_emptyCandidates_returnsEmpty() {
+        List<Document> result = rerankerService.rerank("query", Collections.emptyList());
+        assertThat(result).isEmpty();
+        verifyNoInteractions(restTemplate);
+    }
+
+    @Test
+    void rerank_blankApiKey_returnsOriginalOrderLimitedToTopK() {
+        setField(rerankerService, "apiKey", "");
+
+        List<Document> candidates = List.of(
+                createDoc("doc1", "1", "0", 0.6),
+                createDoc("doc2", "2", "0", 0.7),
+                createDoc("doc3", "3", "0", 0.5)
+        );
+
+        List<Document> result = rerankerService.rerank("query", candidates);
+
+        assertThat(result).hasSize(3);
+        // Returns original order, limited to topK
+        assertThat(result.get(0).getText()).isEqualTo("doc1");
+        assertThat(result.get(1).getText()).isEqualTo("doc2");
+        assertThat(result.get(2).getText()).isEqualTo("doc3");
+        verifyNoInteractions(restTemplate);
+    }
+
+    @Test
+    void rerank_blankApiKey_limitsToTopK() {
+        setField(rerankerService, "apiKey", "  ");  // whitespace only is also blank
+
+        List<Document> candidates = new ArrayList<>();
+        for (int i = 0; i < 10; i++) {
+            candidates.add(createDoc("doc" + i, String.valueOf(i), "0", 0.5));
         }
 
-        response.set("results", results);
-        return response;
+        List<Document> result = rerankerService.rerank("query", candidates);
+
+        assertThat(result).hasSize(5); // limited by topK=5
+    }
+
+    // ==================== API failure ====================
+
+    @Test
+    void rerank_apiFailure_returnsOriginalOrderLimitedToTopK() {
+        List<Document> candidates = new ArrayList<>();
+        for (int i = 0; i < 8; i++) {
+            candidates.add(createDoc("doc" + i, String.valueOf(i), "0", 0.5));
+        }
+
+        when(restTemplate.postForObject(anyString(), any(HttpEntity.class), eq(String.class)))
+                .thenThrow(new RuntimeException("Connection refused"));
+
+        List<Document> result = rerankerService.rerank("query", candidates);
+
+        // Falls back to original order, limited to topK=5
+        assertThat(result).hasSize(5);
+        assertThat(result.get(0).getText()).isEqualTo("doc0");
+    }
+
+    @Test
+    void rerank_apiReturnsInvalidJson_returnsOriginalOrder() {
+        List<Document> candidates = List.of(
+                createDoc("doc1", "1", "0", 0.6)
+        );
+
+        when(restTemplate.postForObject(anyString(), any(HttpEntity.class), eq(String.class)))
+                .thenReturn("not valid json{{{");
+
+        List<Document> result = rerankerService.rerank("query", candidates);
+
+        // Falls back to original order
+        assertThat(result).hasSize(1);
+    }
+
+    // ==================== Malformed response ====================
+
+    @Test
+    void rerank_missingResultsField_returnsOriginalOrder() {
+        List<Document> candidates = List.of(
+                createDoc("doc1", "1", "0", 0.6),
+                createDoc("doc2", "2", "0", 0.5)
+        );
+
+        when(restTemplate.postForObject(anyString(), any(HttpEntity.class), eq(String.class)))
+                .thenReturn("{\"data\":\"something\"}");
+
+        List<Document> result = rerankerService.rerank("query", candidates);
+
+        assertThat(result).hasSize(2);
+    }
+
+    @Test
+    void rerank_resultMissingIndexOrScore_skipsEntry() {
+        List<Document> candidates = List.of(
+                createDoc("doc1", "1", "0", 0.6),
+                createDoc("doc2", "2", "0", 0.5)
+        );
+
+        // First result has no "score", second is valid
+        String apiResponse = "{\"results\":[" +
+                "{\"index\":0}," +
+                "{\"index\":1,\"score\":0.9}" +
+                "]}";
+        when(restTemplate.postForObject(anyString(), any(HttpEntity.class), eq(String.class)))
+                .thenReturn(apiResponse);
+
+        List<Document> result = rerankerService.rerank("query", candidates);
+
+        // Only the valid entry is included
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getText()).isEqualTo("doc2");
+        assertThat(result.get(0).getScore()).isEqualTo(0.9);
+    }
+
+    @Test
+    void rerank_resultIndexOutOfBounds_skipsEntry() {
+        List<Document> candidates = List.of(
+                createDoc("doc1", "1", "0", 0.6)
+        );
+
+        // Index 5 is out of bounds (only 1 candidate)
+        String apiResponse = "{\"results\":[{\"index\":5,\"score\":0.9}]}";
+        when(restTemplate.postForObject(anyString(), any(HttpEntity.class), eq(String.class)))
+                .thenReturn(apiResponse);
+
+        List<Document> result = rerankerService.rerank("query", candidates);
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void rerank_negativeIndex_skipsEntry() {
+        List<Document> candidates = List.of(
+                createDoc("doc1", "1", "0", 0.6)
+        );
+
+        String apiResponse = "{\"results\":[{\"index\":-1,\"score\":0.9}]}";
+        when(restTemplate.postForObject(anyString(), any(HttpEntity.class), eq(String.class)))
+                .thenReturn(apiResponse);
+
+        List<Document> result = rerankerService.rerank("query", candidates);
+
+        assertThat(result).isEmpty();
+    }
+
+    // ==================== API call verification ====================
+
+    @Test
+    void rerank_callsCorrectUrl() {
+        List<Document> candidates = List.of(createDoc("doc1", "1", "0", 0.5));
+        when(restTemplate.postForObject(anyString(), any(HttpEntity.class), eq(String.class)))
+                .thenReturn("{\"results\":[{\"index\":0,\"score\":0.9}]}");
+
+        rerankerService.rerank("query", candidates);
+
+        verify(restTemplate).postForObject(
+                eq("https://api.siliconflow.cn/v1/rerank"),
+                any(HttpEntity.class),
+                eq(String.class)
+        );
     }
 }

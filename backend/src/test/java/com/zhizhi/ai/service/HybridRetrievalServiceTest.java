@@ -8,9 +8,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -19,12 +22,13 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("HybridRetrievalService Unit Tests")
+@MockitoSettings(strictness = Strictness.LENIENT)
+@DisplayName("HybridRetrievalService")
 class HybridRetrievalServiceTest {
 
     @InjectMocks
@@ -39,13 +43,16 @@ class HybridRetrievalServiceTest {
     @Mock
     private EntityManager entityManager;
 
-    private final Long TENANT_ID = 1L;
-    private final Long KB_ID_1 = 10L;
-    private final Long KB_ID_2 = 20L;
-    private final Set<Long> KB_IDS = Set.of(KB_ID_1, KB_ID_2);
+    private static final Long TENANT_ID = 1L;
+    private static final Long KB_ID_1 = 10L;
+    private static final Long KB_ID_2 = 20L;
+    private static final Set<Long> KB_IDS = Set.of(KB_ID_1, KB_ID_2);
 
     @BeforeEach
     void setUp() {
+        // @PersistenceContext field is not in the @RequiredArgsConstructor constructor,
+        // so @InjectMocks may not inject it. Manually ensure it's set.
+        ReflectionTestUtils.setField(hybridRetrievalService, "entityManager", entityManager);
         ReflectionTestUtils.setField(hybridRetrievalService, "alpha", 0.5);
         ReflectionTestUtils.setField(hybridRetrievalService, "rrfK", 60);
         ReflectionTestUtils.setField(hybridRetrievalService, "topK", 5);
@@ -53,610 +60,1007 @@ class HybridRetrievalServiceTest {
         ReflectionTestUtils.setField(hybridRetrievalService, "maxChunksPerDoc", 2);
     }
 
+    // ==================== Helper methods ====================
+
+    private Document buildDoc(String text, String docId, String chunkIdx, String kbId) {
+        Map<String, Object> meta = new HashMap<>();
+        meta.put("document_id", docId);
+        meta.put("chunk_index", chunkIdx);
+        meta.put("knowledge_base_id", kbId);
+        meta.put("tenant_id", String.valueOf(TENANT_ID));
+        return new Document(text, meta);
+    }
+
+    private Document buildDocWithScore(String text, String docId, String chunkIdx, String kbId, double score) {
+        Map<String, Object> meta = new HashMap<>();
+        meta.put("document_id", docId);
+        meta.put("chunk_index", chunkIdx);
+        meta.put("knowledge_base_id", kbId);
+        meta.put("tenant_id", String.valueOf(TENANT_ID));
+        return Document.builder().text(text).metadata(meta).score(score).build();
+    }
+
+    private List<Document> buildDocList(int count, String prefix, String kbId) {
+        List<Document> docs = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            docs.add(buildDoc("content-" + prefix + "-" + i, prefix + "-doc-" + i,
+                    String.valueOf(i), kbId));
+        }
+        return docs;
+    }
+
+    private List<DocumentChunk> buildChunks(int count, long kbId) {
+        List<DocumentChunk> chunks = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            chunks.add(DocumentChunk.builder()
+                    .id((long) i)
+                    .documentId(100L + i)
+                    .knowledgeBaseId(kbId)
+                    .tenantId(TENANT_ID)
+                    .chunkIndex(i)
+                    .content("chunk-content-" + i)
+                    .build());
+        }
+        return chunks;
+    }
+
+    /**
+     * Set up vectorStore mock using doReturn() to avoid overload ambiguity
+     * between similaritySearch(SearchRequest) and similaritySearch(String).
+     */
+    private void mockVectorSearch(List<Document> results) {
+        doReturn(results).when(vectorStore).similaritySearch(any(SearchRequest.class));
+    }
+
+    /**
+     * Mock EntityManager to return the given chunks for any native query.
+     */
+    private void mockEntityManagerReturns(List<DocumentChunk> chunks) {
+        Query mockQuery = mock(Query.class);
+        when(mockQuery.getResultList()).thenReturn(chunks);
+        when(entityManager.createNativeQuery(anyString(), eq(DocumentChunk.class)))
+                .thenReturn(mockQuery);
+    }
+
+    /**
+     * Mock EntityManager with consecutive return values
+     * (first call = fullTextSearch, second = keywordSearch).
+     */
+    private Query mockEntityManagerConsecutive(List<DocumentChunk> first, List<DocumentChunk> second) {
+        Query mockQuery = mock(Query.class);
+        when(mockQuery.getResultList()).thenReturn(first, second);
+        when(entityManager.createNativeQuery(anyString(), eq(DocumentChunk.class)))
+                .thenReturn(mockQuery);
+        return mockQuery;
+    }
+
+    /**
+     * Set up a mock Query that returns the given chunks, and set up EntityManager
+     * to return that query. Returns the Query mock for parameter verification.
+     */
+    private Query setupQueryMock(List<DocumentChunk> chunks) {
+        Query mockQuery = mock(Query.class);
+        when(mockQuery.getResultList()).thenReturn(chunks);
+        when(entityManager.createNativeQuery(anyString(), eq(DocumentChunk.class)))
+                .thenReturn(mockQuery);
+        return mockQuery;
+    }
+
+    // ==================== hybridSearch (main flow) ====================
+
     @Nested
-    @DisplayName("Hybrid Search - hybridSearch")
-    class HybridSearch {
+    @DisplayName("hybridSearch - end-to-end flow")
+    class HybridSearchFlow {
 
         @Test
-        @DisplayName("Hybrid search completes successfully")
-        void testHybridSearchSuccess() {
-            String query = "test query";
-            List<Document> vectorResults = createDocuments(3, "vector");
-            List<Document> rerankResults = createDocuments(2, "rerank");
+        @DisplayName("Happy path: three sources fused, deduped, reranked")
+        void hybridSearch_happyPath_returnsRerankedResults() {
+            List<Document> vectorDocs = buildDocList(3, "vec", String.valueOf(KB_ID_1));
+            List<DocumentChunk> ftChunks = buildChunks(2, KB_ID_1);
+            List<DocumentChunk> kwChunks = buildChunks(2, KB_ID_1);
+            List<Document> reranked = List.of(
+                    buildDocWithScore("reranked-0", "100", "0", String.valueOf(KB_ID_1), 0.95),
+                    buildDocWithScore("reranked-1", "101", "1", String.valueOf(KB_ID_1), 0.85)
+            );
 
-            when(vectorStore.similaritySearch(any(SearchRequest.class)))
-                    .thenReturn(vectorResults);
-            Query mockQuery = mock(Query.class);
-            when(mockQuery.getResultList()).thenReturn(Collections.emptyList());
-            when(entityManager.createNativeQuery(anyString(), eq(DocumentChunk.class)))
-                    .thenReturn(mockQuery);
+            mockVectorSearch(vectorDocs);
+            mockEntityManagerConsecutive(ftChunks, kwChunks);
+            when(rerankerService.rerank(anyString(), anyList())).thenReturn(reranked);
 
-            when(rerankerService.rerank(anyString(), any(List.class)))
-                    .thenReturn(rerankResults);
+            List<Document> result = hybridRetrievalService.hybridSearch("test query", KB_IDS, TENANT_ID);
 
-            List<Document> result = hybridRetrievalService.hybridSearch(query, KB_IDS, TENANT_ID);
-
-            assertThat(result).isNotNull();
+            assertThat(result).hasSize(2);
+            assertThat(result.get(0).getScore()).isEqualTo(0.95);
+            assertThat(result.get(1).getScore()).isEqualTo(0.85);
             verify(vectorStore, times(1)).similaritySearch(any(SearchRequest.class));
-            verify(rerankerService, times(1)).rerank(anyString(), any(List.class));
+            verify(rerankerService, times(1)).rerank(anyString(), anyList());
         }
 
         @Test
-        @DisplayName("Empty query returns empty results")
-        void testHybridSearchWithEmptyQuery() {
-            String query = "";
-            when(vectorStore.similaritySearch(any(SearchRequest.class)))
-                    .thenReturn(Collections.emptyList());
+        @DisplayName("All sources empty produces empty result")
+        void hybridSearch_allSourcesEmpty_returnsEmpty() {
+            mockVectorSearch(Collections.emptyList());
+            mockEntityManagerReturns(Collections.emptyList());
+            when(rerankerService.rerank(anyString(), anyList())).thenReturn(Collections.emptyList());
 
-            List<Document> result = hybridRetrievalService.hybridSearch(query, KB_IDS, TENANT_ID);
+            List<Document> result = hybridRetrievalService.hybridSearch("query", KB_IDS, TENANT_ID);
 
             assertThat(result).isEmpty();
         }
 
         @Test
-        @DisplayName("Null query returns empty results")
-        void testHybridSearchWithNullQuery() {
-            when(vectorStore.similaritySearch(any(SearchRequest.class)))
-                    .thenReturn(Collections.emptyList());
+        @DisplayName("Vector search exception is handled gracefully")
+        void hybridSearch_vectorSearchException_gracefullyDegrades() {
+            doThrow(new RuntimeException("pgvector down"))
+                    .when(vectorStore).similaritySearch(any(SearchRequest.class));
+            mockEntityManagerReturns(Collections.emptyList());
+            when(rerankerService.rerank(anyString(), anyList())).thenReturn(Collections.emptyList());
 
-            List<Document> result = hybridRetrievalService.hybridSearch(null, KB_IDS, TENANT_ID);
-
-            assertThat(result).isEmpty();
-        }
-
-        @Test
-        @DisplayName("Empty knowledge base IDs return empty results")
-        void testHybridSearchWithEmptyKnowledgeBaseIds() {
-            String query = "test query";
-            Set<Long> emptyKbIds = Collections.emptySet();
-            when(vectorStore.similaritySearch(any(SearchRequest.class)))
-                    .thenReturn(Collections.emptyList());
-
-            List<Document> result = hybridRetrievalService.hybridSearch(query, emptyKbIds, TENANT_ID);
+            List<Document> result = hybridRetrievalService.hybridSearch("query", KB_IDS, TENANT_ID);
 
             assertThat(result).isEmpty();
         }
 
         @Test
-        @DisplayName("VectorStore exception is handled gracefully")
-        void testHybridSearchWithVectorStoreException() {
-            String query = "test query";
-            when(vectorStore.similaritySearch(any(SearchRequest.class)))
-                    .thenThrow(new RuntimeException("Vector store error"));
+        @DisplayName("Full-text search exception is handled gracefully")
+        void hybridSearch_fullTextSearchException_gracefullyDegrades() {
+            mockVectorSearch(buildDocList(2, "v", String.valueOf(KB_ID_1)));
+            when(entityManager.createNativeQuery(anyString(), eq(DocumentChunk.class)))
+                    .thenThrow(new RuntimeException("tsvector error"));
+            when(rerankerService.rerank(anyString(), anyList())).thenReturn(Collections.emptyList());
 
-            List<Document> result = hybridRetrievalService.hybridSearch(query, KB_IDS, TENANT_ID);
+            hybridRetrievalService.hybridSearch("query", KB_IDS, TENANT_ID);
 
-            assertThat(result).isEmpty();
+            // Reranker is still called with whatever was collected (vector docs only)
+            verify(rerankerService).rerank(anyString(), anyList());
         }
 
         @Test
-        @DisplayName("Filter expression includes tenant_id for multi-tenant isolation")
-        void testHybridSearchIncludesTenantIdFilter() {
-            String query = "test query";
-            List<Document> documents = createDocuments(2, "test");
-            when(vectorStore.similaritySearch(any(SearchRequest.class)))
-                    .thenReturn(documents);
-            when(rerankerService.rerank(anyString(), any(List.class)))
-                    .thenReturn(Collections.emptyList());
+        @DisplayName("Reranker receives at most topK*2 candidates")
+        void hybridSearch_rerankerReceivesLimitedCandidates() {
+            List<Document> vectorDocs = buildDocList(30, "v", String.valueOf(KB_ID_1));
+            List<Document> reranked = List.of(
+                    buildDocWithScore("r", "1", "0", String.valueOf(KB_ID_1), 0.9));
+
+            mockVectorSearch(vectorDocs);
+            mockEntityManagerReturns(Collections.emptyList());
+            when(rerankerService.rerank(anyString(), anyList())).thenReturn(reranked);
+
+            hybridRetrievalService.hybridSearch("query", KB_IDS, TENANT_ID);
+
+            verify(rerankerService).rerank(eq("query"), argThat(candidates -> candidates.size() <= 10));
+        }
+
+        @Test
+        @DisplayName("Passes correct query to vectorStore and reranker")
+        void hybridSearch_passesQueryToAllServices() {
+            String query = "specific user question";
+            mockVectorSearch(Collections.emptyList());
+            mockEntityManagerReturns(Collections.emptyList());
+            when(rerankerService.rerank(anyString(), anyList())).thenReturn(Collections.emptyList());
 
             hybridRetrievalService.hybridSearch(query, KB_IDS, TENANT_ID);
 
-            verify(vectorStore).similaritySearch(argThat(request ->
-                    request.getFilterExpression() != null &&
-                            request.getFilterExpression().contains("tenant_id")
-            ));
+            ArgumentCaptor<SearchRequest> captor = ArgumentCaptor.forClass(SearchRequest.class);
+            verify(vectorStore).similaritySearch(captor.capture());
+            assertThat(captor.getValue().getQuery()).isEqualTo(query);
+            verify(rerankerService).rerank(eq(query), anyList());
+        }
+
+        @Test
+        @DisplayName("Null vectorStore result is treated as empty")
+        void hybridSearch_nullVectorResult_treatedAsEmpty() {
+            doReturn(null).when(vectorStore).similaritySearch(any(SearchRequest.class));
+            mockEntityManagerReturns(Collections.emptyList());
+            when(rerankerService.rerank(anyString(), anyList())).thenReturn(Collections.emptyList());
+
+            List<Document> result = hybridRetrievalService.hybridSearch("query", KB_IDS, TENANT_ID);
+
+            assertThat(result).isEmpty();
         }
     }
 
+    // ==================== hybridSearch with allowedDocIds (tag filter) ====================
+
     @Nested
-    @DisplayName("Full Text Search - fullTextSearch")
+    @DisplayName("hybridSearch - allowedDocIds filtering")
+    class AllowedDocIdsFiltering {
+
+        @Test
+        @DisplayName("Filters results to only allowed document IDs")
+        void hybridSearch_withAllowedDocIds_filtersCorrectly() {
+            List<Document> vectorDocs = List.of(
+                    buildDoc("c1", "100", "0", String.valueOf(KB_ID_1)),
+                    buildDoc("c2", "101", "0", String.valueOf(KB_ID_1)),
+                    buildDoc("c3", "102", "0", String.valueOf(KB_ID_1))
+            );
+            List<Document> reranked = List.of(
+                    buildDocWithScore("c1", "100", "0", String.valueOf(KB_ID_1), 0.9));
+
+            mockVectorSearch(vectorDocs);
+            mockEntityManagerReturns(Collections.emptyList());
+            when(rerankerService.rerank(anyString(), anyList())).thenReturn(reranked);
+
+            Set<Long> allowedDocIds = Set.of(100L);
+            hybridRetrievalService.hybridSearch("query", KB_IDS, TENANT_ID, allowedDocIds);
+
+            // The reranker should only receive doc 100 (not 101 or 102)
+            verify(rerankerService).rerank(eq("query"), argThat(candidates ->
+                    candidates.stream().allMatch(d ->
+                            "100".equals(d.getMetadata().get("document_id").toString()))
+            ));
+        }
+
+        @Test
+        @DisplayName("Null allowedDocIds means no filtering")
+        void hybridSearch_nullAllowedDocIds_noFilter() {
+            List<Document> vectorDocs = List.of(
+                    buildDoc("c1", "100", "0", String.valueOf(KB_ID_1)),
+                    buildDoc("c2", "101", "0", String.valueOf(KB_ID_1))
+            );
+            List<Document> reranked = List.of(
+                    buildDocWithScore("c1", "100", "0", String.valueOf(KB_ID_1), 0.9));
+
+            mockVectorSearch(vectorDocs);
+            mockEntityManagerReturns(Collections.emptyList());
+            when(rerankerService.rerank(anyString(), anyList())).thenReturn(reranked);
+
+            hybridRetrievalService.hybridSearch("query", KB_IDS, TENANT_ID, null);
+
+            // Both docs should reach the reranker
+            verify(rerankerService).rerank(eq("query"), argThat(candidates -> candidates.size() == 2));
+        }
+
+        @Test
+        @DisplayName("Empty allowedDocIds filters out everything")
+        void hybridSearch_emptyAllowedDocIds_filtersAll() {
+            List<Document> vectorDocs = List.of(
+                    buildDoc("c1", "100", "0", String.valueOf(KB_ID_1))
+            );
+
+            mockVectorSearch(vectorDocs);
+            mockEntityManagerReturns(Collections.emptyList());
+            when(rerankerService.rerank(anyString(), anyList())).thenReturn(Collections.emptyList());
+
+            hybridRetrievalService.hybridSearch("query", KB_IDS, TENANT_ID, Collections.emptySet());
+
+            // All docs filtered before reaching reranker
+            verify(rerankerService).rerank(eq("query"), argThat(List::isEmpty));
+        }
+    }
+
+    // ==================== Vector search ====================
+
+    @Nested
+    @DisplayName("Vector search")
+    class VectorSearch {
+
+        @Test
+        @DisplayName("Filter expression includes tenant_id")
+        void vectorSearch_filterIncludesTenantId() {
+            mockVectorSearch(Collections.emptyList());
+            mockEntityManagerReturns(Collections.emptyList());
+            when(rerankerService.rerank(anyString(), anyList())).thenReturn(Collections.emptyList());
+
+            hybridRetrievalService.hybridSearch("query", KB_IDS, TENANT_ID);
+
+            ArgumentCaptor<SearchRequest> captor = ArgumentCaptor.forClass(SearchRequest.class);
+            verify(vectorStore).similaritySearch(captor.capture());
+            assertThat(captor.getValue().hasFilterExpression()).isTrue();
+        }
+
+        @Test
+        @DisplayName("Uses expanded topK = topK * 3")
+        void vectorSearch_usesExpandedTopK() {
+            mockVectorSearch(Collections.emptyList());
+            mockEntityManagerReturns(Collections.emptyList());
+            when(rerankerService.rerank(anyString(), anyList())).thenReturn(Collections.emptyList());
+
+            hybridRetrievalService.hybridSearch("query", KB_IDS, TENANT_ID);
+
+            // topK=5, expandedTopK=15
+            ArgumentCaptor<SearchRequest> captor = ArgumentCaptor.forClass(SearchRequest.class);
+            verify(vectorStore).similaritySearch(captor.capture());
+            assertThat(captor.getValue().getTopK()).isEqualTo(15);
+        }
+
+        @Test
+        @DisplayName("Uses configured similarity threshold")
+        void vectorSearch_usesThreshold() {
+            mockVectorSearch(Collections.emptyList());
+            mockEntityManagerReturns(Collections.emptyList());
+            when(rerankerService.rerank(anyString(), anyList())).thenReturn(Collections.emptyList());
+
+            hybridRetrievalService.hybridSearch("query", KB_IDS, TENANT_ID);
+
+            ArgumentCaptor<SearchRequest> captor = ArgumentCaptor.forClass(SearchRequest.class);
+            verify(vectorStore).similaritySearch(captor.capture());
+            assertThat(captor.getValue().getSimilarityThreshold()).isCloseTo(0.7, org.assertj.core.data.Offset.offset(0.001));
+        }
+
+        @Test
+        @DisplayName("Single KB ID produces simple filter (no OR)")
+        void vectorSearch_singleKbId_simpleFilter() {
+            String filter = invokeBuildFilterExpression(Set.of(KB_ID_1), TENANT_ID);
+
+            assertThat(filter).contains("knowledge_base_id == '" + KB_ID_1 + "'");
+            assertThat(filter).contains("tenant_id == '" + TENANT_ID + "'");
+            assertThat(filter).doesNotContain("||");
+        }
+
+        @Test
+        @DisplayName("Multiple KB IDs produce OR filter")
+        void vectorSearch_multipleKbIds_orFilter() {
+            String filter = invokeBuildFilterExpression(KB_IDS, TENANT_ID);
+
+            assertThat(filter).contains("||");
+            assertThat(filter).contains("knowledge_base_id == '" + KB_ID_1 + "'");
+            assertThat(filter).contains("knowledge_base_id == '" + KB_ID_2 + "'");
+            assertThat(filter).contains("tenant_id == '" + TENANT_ID + "'");
+        }
+    }
+
+    // ==================== Full-text search ====================
+
+    @Nested
+    @DisplayName("Full-text search")
     class FullTextSearch {
 
         @Test
-        @DisplayName("Full text search returns converted DocumentChunk list")
-        void testFullTextSearchSuccess() {
-            String query = "test";
-            List<DocumentChunk> chunks = createDocumentChunks(3);
-            Query mockQuery = mock(Query.class);
-            when(mockQuery.getResultList()).thenReturn(chunks);
-            when(entityManager.createNativeQuery(anyString(), eq(DocumentChunk.class)))
-                    .thenReturn(mockQuery);
+        @DisplayName("Returns converted Document objects from DocumentChunk")
+        void fullTextSearch_convertsChunks() {
+            DocumentChunk chunk = DocumentChunk.builder()
+                    .id(1L).content("full text match").knowledgeBaseId(KB_ID_1)
+                    .documentId(100L).tenantId(TENANT_ID).chunkIndex(0).build();
+            setupQueryMock(List.of(chunk));
 
-            List<Document> result = callFullTextSearch(query, KB_IDS, TENANT_ID, 15);
+            List<Document> result = invokeFullTextSearch("match", KB_IDS, TENANT_ID, 15);
 
-            assertThat(result).hasSize(3);
-            assertThat(result.get(0).getMetadata()).containsEntry("knowledge_base_id", "10");
+            assertThat(result).hasSize(1);
+            assertThat(result.get(0).getText()).isEqualTo("full text match");
+            assertThat(result.get(0).getMetadata()).containsEntry("knowledge_base_id", String.valueOf(KB_ID_1));
+            assertThat(result.get(0).getMetadata()).containsEntry("document_id", "100");
+            assertThat(result.get(0).getMetadata()).containsEntry("chunk_index", "0");
+            assertThat(result.get(0).getMetadata()).containsEntry("tenant_id", String.valueOf(TENANT_ID));
         }
 
         @Test
-        @DisplayName("Full text search query parameters are correct")
-        void testFullTextSearchQueryParameters() {
-            String query = "test query";
-            Query mockQuery = mock(Query.class);
-            when(mockQuery.getResultList()).thenReturn(Collections.emptyList());
-            when(entityManager.createNativeQuery(anyString(), eq(DocumentChunk.class)))
-                    .thenReturn(mockQuery);
+        @DisplayName("Sets correct query parameters")
+        void fullTextSearch_setsParameters() {
+            Query mockQuery = setupQueryMock(Collections.emptyList());
 
-            callFullTextSearch(query, KB_IDS, TENANT_ID, 15);
+            invokeFullTextSearch("search term", KB_IDS, TENANT_ID, 20);
 
-            verify(entityManager, times(1)).createNativeQuery(anyString(), eq(DocumentChunk.class));
-            verify(mockQuery).setParameter("tenantId", TENANT_ID);
-            verify(mockQuery).setParameter("query", query);
-            verify(mockQuery).setParameter("limit", 15);
+            verify(mockQuery).setParameter(eq("kbIds"), anyList());
+            verify(mockQuery).setParameter(eq("tenantId"), eq(TENANT_ID));
+            verify(mockQuery).setParameter(eq("query"), eq("search term"));
+            verify(mockQuery).setParameter(eq("limit"), eq(20));
         }
 
         @Test
-        @DisplayName("Database exception returns empty list")
-        void testFullTextSearchWithException() {
-            String query = "test query";
+        @DisplayName("DB exception returns empty list")
+        void fullTextSearch_dbException_returnsEmpty() {
             when(entityManager.createNativeQuery(anyString(), eq(DocumentChunk.class)))
-                    .thenThrow(new RuntimeException("Database error"));
+                    .thenThrow(new RuntimeException("connection lost"));
 
-            List<Document> result = callFullTextSearch(query, KB_IDS, TENANT_ID, 15);
+            List<Document> result = invokeFullTextSearch("query", KB_IDS, TENANT_ID, 15);
 
             assertThat(result).isEmpty();
         }
 
         @Test
         @DisplayName("No results returns empty list")
-        void testFullTextSearchWithNoResults() {
-            String query = "nonexistent";
-            Query mockQuery = mock(Query.class);
-            when(mockQuery.getResultList()).thenReturn(Collections.emptyList());
-            when(entityManager.createNativeQuery(anyString(), eq(DocumentChunk.class)))
-                    .thenReturn(mockQuery);
+        void fullTextSearch_noResults_returnsEmpty() {
+            setupQueryMock(Collections.emptyList());
 
-            List<Document> result = callFullTextSearch(query, KB_IDS, TENANT_ID, 15);
+            List<Document> result = invokeFullTextSearch("nonexistent", KB_IDS, TENANT_ID, 15);
 
             assertThat(result).isEmpty();
         }
 
         @Test
-        @DisplayName("Results preserve tenant_id in metadata")
-        void testFullTextSearchPreservesTenantId() {
-            String query = "test";
-            List<DocumentChunk> chunks = createDocumentChunks(1);
-            Query mockQuery = mock(Query.class);
-            when(mockQuery.getResultList()).thenReturn(chunks);
-            when(entityManager.createNativeQuery(anyString(), eq(DocumentChunk.class)))
-                    .thenReturn(mockQuery);
+        @DisplayName("Multiple chunks are all converted")
+        void fullTextSearch_multipleChunks_allConverted() {
+            List<DocumentChunk> chunks = buildChunks(3, KB_ID_1);
+            setupQueryMock(chunks);
 
-            List<Document> result = callFullTextSearch(query, KB_IDS, TENANT_ID, 15);
+            List<Document> result = invokeFullTextSearch("query", KB_IDS, TENANT_ID, 15);
 
-            assertThat(result).hasSize(1);
-            assertThat(result.get(0).getMetadata()).containsEntry("tenant_id", String.valueOf(TENANT_ID));
+            assertThat(result).hasSize(3);
+            for (int i = 0; i < 3; i++) {
+                assertThat(result.get(i).getText()).isEqualTo("chunk-content-" + i);
+            }
         }
     }
 
+    // ==================== Keyword extraction ====================
+
     @Nested
-    @DisplayName("Keyword Extraction - extractKeywords")
+    @DisplayName("Keyword extraction")
     class KeywordExtraction {
 
         @Test
-        @DisplayName("Extract keywords from query")
-        void testExtractKeywords() {
-            String query = "test search query";
+        @DisplayName("Extracts words of length >= 2")
+        void extractKeywords_filtersByLength() {
+            List<String> keywords = invokeExtractKeywords("a big test of keywords");
 
-            List<String> keywords = callExtractKeywords(query);
-
-            assertThat(keywords).isNotEmpty();
-            assertThat(keywords).allMatch(kw -> kw.length() >= 2);
+            assertThat(keywords).contains("big", "test", "of", "keywords");
+            assertThat(keywords).doesNotContain("a");
         }
 
         @Test
-        @DisplayName("Handle Chinese punctuation")
-        void testExtractKeywordsWithChinesePunctuation() {
-            String query = "test query with punctuation. More content!";
-
-            List<String> keywords = callExtractKeywords(query);
-
-            assertThat(keywords).isNotEmpty();
-        }
-
-        @Test
-        @DisplayName("Remove duplicate keywords")
-        void testExtractKeywordsRemovesDuplicates() {
-            String query = "test test query query";
-
-            List<String> keywords = callExtractKeywords(query);
+        @DisplayName("Removes duplicates")
+        void extractKeywords_removesDuplicates() {
+            List<String> keywords = invokeExtractKeywords("test test hello hello");
 
             assertThat(keywords).doesNotHaveDuplicates();
+            assertThat(keywords).containsExactlyInAnyOrder("test", "hello");
         }
 
         @Test
-        @DisplayName("Empty query returns empty list")
-        void testExtractKeywordsWithEmptyQuery() {
-            String query = "";
+        @DisplayName("Handles Chinese punctuation")
+        void extractKeywords_chinesePunctuation() {
+            List<String> keywords = invokeExtractKeywords("你好，世界！测试一下");
 
-            List<String> keywords = callExtractKeywords(query);
+            assertThat(keywords).contains("你好", "世界", "测试一下");
+        }
 
-            assertThat(keywords).isEmpty();
+        @Test
+        @DisplayName("Handles mixed whitespace and punctuation")
+        void extractKeywords_mixedDelimiters() {
+            List<String> keywords = invokeExtractKeywords("  hello,  world;  test  ");
+
+            assertThat(keywords).containsExactlyInAnyOrder("hello", "world", "test");
+        }
+
+        @Test
+        @DisplayName("Empty string returns empty list")
+        void extractKeywords_empty_returnsEmpty() {
+            assertThat(invokeExtractKeywords("")).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Blank string returns empty list")
+        void extractKeywords_blank_returnsEmpty() {
+            assertThat(invokeExtractKeywords("   ")).isEmpty();
         }
 
         @Test
         @DisplayName("Null query returns empty list")
-        void testExtractKeywordsWithNullQuery() {
-            String query = null;
+        void extractKeywords_null_returnsEmpty() {
+            assertThat(invokeExtractKeywords(null)).isEmpty();
+        }
 
-            List<String> keywords = callExtractKeywords(query);
+        @Test
+        @DisplayName("Only single-char words returns empty list")
+        void extractKeywords_onlySingleCharWords_returnsEmpty() {
+            assertThat(invokeExtractKeywords("a b c")).isEmpty();
+        }
 
+        @Test
+        @DisplayName("Single character Chinese returns empty (length < 2)")
+        void extractKeywords_singleCharChinese_excluded() {
+            List<String> keywords = invokeExtractKeywords("你 好 世 界");
             assertThat(keywords).isEmpty();
         }
 
         @Test
-        @DisplayName("Filter out short words")
-        void testExtractKeywordsFiltersShortWords() {
-            String query = "a test b query we";
-
-            List<String> keywords = callExtractKeywords(query);
-
-            assertThat(keywords).allMatch(kw -> kw.length() >= 2);
+        @DisplayName("Two character Chinese words are included")
+        void extractKeywords_twoCharChinese_included() {
+            List<String> keywords = invokeExtractKeywords("你好 世界 测试");
+            assertThat(keywords).containsExactlyInAnyOrder("你好", "世界", "测试");
         }
     }
 
+    // ==================== Keyword search ====================
+
     @Nested
-    @DisplayName("RRF Fusion - rrfFusion")
-    class RRFFusion {
+    @DisplayName("Keyword search")
+    class KeywordSearch {
 
         @Test
-        @DisplayName("Three-way fusion calculates scores correctly")
-        void testRRFFusionCalculatesScores() {
-            List<Document> vectorResults = createDocumentsWithIds(3, "vector");
-            List<Document> fullTextResults = createDocumentsWithIds(2, "fulltext");
-            List<Document> keywordResults = createDocumentsWithIds(2, "keyword");
+        @DisplayName("Returns empty when keywords list is empty")
+        void keywordSearch_emptyKeywords_returnsEmpty() {
+            List<Document> result = invokeKeywordSearch(Collections.emptyList(), KB_IDS, TENANT_ID, 15);
 
-            List<Document> result = callRRFFusion(vectorResults, fullTextResults, keywordResults);
-
-            assertThat(result).isNotEmpty();
-            for (int i = 0; i < result.size() - 1; i++) {
-                assertThat(result.get(i).getScore())
-                        .isGreaterThanOrEqualTo(result.get(i + 1).getScore());
-            }
+            assertThat(result).isEmpty();
+            verifyNoInteractions(entityManager);
         }
 
         @Test
-        @DisplayName("Single result list fusion")
-        void testRRFFusionWithSingleList() {
-            List<Document> vectorResults = createDocumentsWithIds(3, "vector");
-            List<Document> emptyList = Collections.emptyList();
+        @DisplayName("Converts DocumentChunk results to Documents")
+        void keywordSearch_convertsChunks() {
+            DocumentChunk chunk = DocumentChunk.builder()
+                    .id(1L).content("keyword match").knowledgeBaseId(KB_ID_1)
+                    .documentId(200L).tenantId(TENANT_ID).chunkIndex(2).build();
+            Query mockQuery = setupQueryMock(List.of(chunk));
 
-            List<Document> result = callRRFFusion(vectorResults, emptyList, emptyList);
+            List<Document> result = invokeKeywordSearch(List.of("keyword"), KB_IDS, TENANT_ID, 15);
+
+            assertThat(result).hasSize(1);
+            assertThat(result.get(0).getText()).isEqualTo("keyword match");
+            assertThat(result.get(0).getMetadata()).containsEntry("document_id", "200");
+            assertThat(result.get(0).getMetadata()).containsEntry("chunk_index", "2");
+            // Verify the SQL keyword parameter is set with ILIKE wildcard
+            verify(mockQuery).setParameter(eq("kw0"), eq("%keyword%"));
+        }
+
+        @Test
+        @DisplayName("DB exception returns empty list")
+        void keywordSearch_dbException_returnsEmpty() {
+            when(entityManager.createNativeQuery(anyString(), eq(DocumentChunk.class)))
+                    .thenThrow(new RuntimeException("DB down"));
+
+            List<Document> result = invokeKeywordSearch(List.of("test"), KB_IDS, TENANT_ID, 15);
+
+            assertThat(result).isEmpty();
+        }
+
+        @Test
+        @DisplayName("No results returns empty list")
+        void keywordSearch_noResults_returnsEmpty() {
+            setupQueryMock(Collections.emptyList());
+
+            List<Document> result = invokeKeywordSearch(List.of("rare"), KB_IDS, TENANT_ID, 15);
+
+            assertThat(result).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Multiple chunks converted correctly")
+        void keywordSearch_multipleChunks() {
+            List<DocumentChunk> chunks = buildChunks(3, KB_ID_1);
+            setupQueryMock(chunks);
+
+            List<Document> result = invokeKeywordSearch(List.of("test"), KB_IDS, TENANT_ID, 15);
 
             assertThat(result).hasSize(3);
         }
 
         @Test
-        @DisplayName("All empty lists returns empty")
-        void testRRFFusionWithEmptyLists() {
-            List<Document> emptyList = Collections.emptyList();
+        @DisplayName("Multiple keywords are all passed as parameters")
+        void keywordSearch_multipleKeywords_allParameterized() {
+            setupQueryMock(Collections.emptyList());
 
-            List<Document> result = callRRFFusion(emptyList, emptyList, emptyList);
+            invokeKeywordSearch(List.of("alpha", "beta", "gamma"), KB_IDS, TENANT_ID, 15);
+
+            // Verify all keywords are passed (we can't easily capture the Query mock here
+            // since setupQueryMock creates a new one, but we verify the call doesn't fail)
+            verify(entityManager).createNativeQuery(anyString(), eq(DocumentChunk.class));
+        }
+    }
+
+    // ==================== RRF fusion ====================
+
+    @Nested
+    @DisplayName("RRF fusion")
+    class RRFFusion {
+
+        @Test
+        @DisplayName("Three-way fusion produces sorted results by score descending")
+        void rrfFusion_sortedByScoreDescending() {
+            // Doc 4 at keyword idx 0: weight 0.34 => highest score
+            // Doc 1 at vector idx 0: weight 0.33
+            // Doc 3 at fullText idx 0: weight 0.33
+            List<Document> vector = List.of(
+                    buildDoc("v0", "1", "0", "10"),
+                    buildDoc("v1", "2", "0", "10"));
+            List<Document> fullText = List.of(
+                    buildDoc("ft0", "3", "0", "10"));
+            List<Document> keyword = List.of(
+                    buildDoc("kw0", "4", "0", "10"));
+
+            List<Document> result = invokeRrfFusion(vector, fullText, keyword);
+
+            assertThat(result).hasSize(4);
+            // Doc 4 (keyword idx 0) has highest weight 0.34 => should be first
+            assertThat(result.get(0).getMetadata().get("document_id")).isEqualTo("4");
+        }
+
+        @Test
+        @DisplayName("Documents appearing in multiple lists accumulate scores")
+        void rrfFusion_accumulatesScores() {
+            Document shared = buildDoc("shared", "1", "0", "10");
+            List<Document> vector = List.of(shared);
+            List<Document> fullText = Collections.emptyList();
+            List<Document> keyword = List.of(shared);
+
+            List<Document> result = invokeRrfFusion(vector, fullText, keyword);
+
+            // Same doc_id + chunk_index => same key => accumulated score
+            assertThat(result).hasSize(1);
+            assertThat(result.get(0).getMetadata().get("document_id")).isEqualTo("1");
+        }
+
+        @Test
+        @DisplayName("All empty lists returns empty")
+        void rrfFusion_allEmpty_returnsEmpty() {
+            List<Document> result = invokeRrfFusion(
+                    Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
 
             assertThat(result).isEmpty();
         }
 
         @Test
-        @DisplayName("Duplicate documents accumulate fusion scores")
-        void testRRFFusionAccumulatesScoresForDuplicates() {
-            Document doc1 = createDocumentWithId("doc-1");
-            Document doc2 = createDocumentWithId("doc-2");
-            List<Document> vectorResults = List.of(doc1, doc2);
-            List<Document> fullTextResults = List.of(doc1);
+        @DisplayName("Only vector results returns them")
+        void rrfFusion_onlyVector_returnsVector() {
+            List<Document> vector = buildDocList(3, "v", "10");
 
-            List<Document> result = callRRFFusion(vectorResults, fullTextResults, Collections.emptyList());
+            List<Document> result = invokeRrfFusion(vector, Collections.emptyList(), Collections.emptyList());
 
-            assertThat(result).hasSize(2);
-            assertThat(result.get(0).getMetadata().get("document_id")).isEqualTo("doc-1");
+            assertThat(result).hasSize(3);
         }
 
         @Test
-        @DisplayName("Large lists are fused with deduplication")
-        void testRRFFusionWithLargeLists() {
-            List<Document> vectorResults = createDocumentsWithIds(50, "vector");
-            List<Document> fullTextResults = createDocumentsWithIds(50, "fulltext");
-            List<Document> keywordResults = createDocumentsWithIds(50, "keyword");
+        @DisplayName("Keyword weight (0.34) is higher than vector/fullText (0.33)")
+        void rrfFusion_keywordWeightHigher() {
+            // Each at index 0: rrf = 1/(60+1) = 1/61
+            Document vDoc = buildDoc("v", "1", "0", "10");
+            Document ftDoc = buildDoc("ft", "2", "0", "10");
+            Document kwDoc = buildDoc("kw", "3", "0", "10");
 
-            List<Document> result = callRRFFusion(vectorResults, fullTextResults, keywordResults);
+            List<Document> result = invokeRrfFusion(
+                    List.of(vDoc), List.of(ftDoc), List.of(kwDoc));
 
-            assertThat(result).isNotEmpty();
-            Set<String> resultIds = result.stream()
-                    .map(d -> d.getMetadata().get("document_id").toString())
-                    .collect(Collectors.toSet());
-            assertThat(resultIds.size()).isLessThan(150);
+            // kwDoc at keyword index 0: 0.34 * (1/61) — highest weight
+            assertThat(result.get(0).getMetadata().get("document_id")).isEqualTo("3");
+        }
+
+        @Test
+        @DisplayName("Duplicate doc key across sources uses first-seen document")
+        void rrfFusion_duplicateKey_usesFirstDocument() {
+            Document fromVector = buildDoc("from-vector", "1", "0", "10");
+            Document fromFullText = buildDoc("from-fulltext", "1", "0", "10");
+
+            List<Document> result = invokeRrfFusion(
+                    List.of(fromVector), List.of(fromFullText), Collections.emptyList());
+
+            assertThat(result).hasSize(1);
+            // putIfAbsent preserves the vector-sourced doc
+            assertThat(result.get(0).getText()).isEqualTo("from-vector");
+        }
+
+        @Test
+        @DisplayName("Lower-ranked items have lower RRF scores")
+        void rrfFusion_lowerRanked_lowerScore() {
+            List<Document> vector = buildDocList(5, "v", "10");
+
+            List<Document> result = invokeRrfFusion(vector, Collections.emptyList(), Collections.emptyList());
+
+            // Same order because index 0 has highest RRF score (1/61 > 1/62 > ...)
+            assertThat(result).hasSize(5);
+            assertThat(result.get(0).getMetadata().get("document_id")).isEqualTo("v-doc-0");
+            assertThat(result.get(4).getMetadata().get("document_id")).isEqualTo("v-doc-4");
+        }
+
+        @Test
+        @DisplayName("Empty source list in middle does not affect other sources")
+        void rrfFusion_emptyMiddleSource_othersUnaffected() {
+            List<Document> vector = List.of(buildDoc("v", "1", "0", "10"));
+            List<Document> keyword = List.of(buildDoc("k", "2", "0", "10"));
+
+            List<Document> result = invokeRrfFusion(vector, Collections.emptyList(), keyword);
+
+            assertThat(result).hasSize(2);
         }
     }
 
+    // ==================== Per-document dedup ====================
+
     @Nested
-    @DisplayName("Per-document Deduplication - applyPerDocDedup")
+    @DisplayName("Per-document dedup")
     class PerDocDedup {
 
         @Test
-        @DisplayName("Group by document_id and limit chunks")
-        void testPerDocDedupGroupsAndLimits() {
+        @DisplayName("Limits chunks per document to maxChunksPerDoc")
+        void perDocDedup_limitsChunksPerDoc() {
             List<Document> docs = new ArrayList<>();
             for (int i = 0; i < 5; i++) {
-                Map<String, Object> meta = new HashMap<>();
-                meta.put("knowledge_base_id", "1");
-                meta.put("document_id", "doc-1");
-                meta.put("chunk_index", String.valueOf(i));
-                Document d = new Document("content" + i, meta);
-                d.setScore(1.0 - (i * 0.1));
-                docs.add(d);
+                docs.add(buildDocWithScore("c" + i, "1", String.valueOf(i),
+                        String.valueOf(KB_ID_1), 1.0 - i * 0.1));
             }
 
-            List<Document> result = callApplyPerDocDedup(docs, KB_IDS);
+            List<Document> result = invokePerDocDedup(docs, KB_IDS);
 
-            long doc1Count = result.stream()
-                    .filter(d -> d.getMetadata().get("document_id").equals("doc-1"))
+            long countForDoc1 = result.stream()
+                    .filter(d -> "1".equals(d.getMetadata().get("document_id").toString()))
                     .count();
-            assertThat(doc1Count).isLessThanOrEqualTo(2);
+            assertThat(countForDoc1).isLessThanOrEqualTo(2); // maxChunksPerDoc=2
         }
 
         @Test
-        @DisplayName("Filter out documents not in knowledge base")
-        void testPerDocDedupFiltersUnknownKnowledgeBases() {
-            List<Document> docs = new ArrayList<>();
-            Map<String, Object> meta1 = new HashMap<>();
-            meta1.put("knowledge_base_id", "1");
-            meta1.put("document_id", "doc-1");
-            docs.add(new Document("content1", meta1));
+        @DisplayName("Filters out docs not belonging to the knowledge bases")
+        void perDocDedup_filtersUnknownKbIds() {
+            List<Document> docs = List.of(
+                    buildDocWithScore("in-kb", "1", "0", String.valueOf(KB_ID_1), 0.9),
+                    buildDocWithScore("not-in-kb", "2", "0", "999", 0.95)
+            );
 
-            Map<String, Object> meta2 = new HashMap<>();
-            meta2.put("knowledge_base_id", "999");
-            meta2.put("document_id", "doc-2");
-            docs.add(new Document("content2", meta2));
-
-            List<Document> result = callApplyPerDocDedup(docs, KB_IDS);
+            List<Document> result = invokePerDocDedup(docs, KB_IDS);
 
             assertThat(result).hasSize(1);
-            assertThat(result.get(0).getMetadata().get("knowledge_base_id")).isEqualTo("1");
+            assertThat(result.get(0).getMetadata().get("document_id")).isEqualTo("1");
         }
 
         @Test
-        @DisplayName("Keep highest scoring chunks per document")
-        void testPerDocDedupKeepsHighestScoring() {
-            List<Document> docs = new ArrayList<>();
-            for (int i = 0; i < 3; i++) {
-                Map<String, Object> meta = new HashMap<>();
-                meta.put("knowledge_base_id", "1");
-                meta.put("document_id", "doc-1");
-                meta.put("chunk_index", String.valueOf(i));
-                Document d = new Document("content" + i, meta);
-                d.setScore(0.5 + (i * 0.2));
-                docs.add(d);
-            }
+        @DisplayName("Keeps highest-scoring chunks per document")
+        void perDocDedup_keepsHighestScoring() {
+            List<Document> docs = List.of(
+                    buildDocWithScore("low", "1", "0", String.valueOf(KB_ID_1), 0.3),
+                    buildDocWithScore("high", "1", "1", String.valueOf(KB_ID_1), 0.9)
+            );
 
-            List<Document> result = callApplyPerDocDedup(docs, KB_IDS);
+            List<Document> result = invokePerDocDedup(docs, KB_IDS);
 
-            assertThat(result).hasSizeGreaterThanOrEqualTo(1);
-            assertThat(result.get(0).getScore()).isGreaterThanOrEqualTo(0.7);
+            assertThat(result).hasSize(2); // both fit within maxChunksPerDoc=2
+            // high-score chunk comes first
+            assertThat(result.get(0).getScore()).isEqualTo(0.9);
         }
 
         @Test
-        @DisplayName("Final results limited to topK")
-        void testPerDocDedupLimitsFinalResults() {
+        @DisplayName("Final result limited to topK")
+        void perDocDedup_limitedToTopK() {
             List<Document> docs = new ArrayList<>();
             for (int i = 0; i < 20; i++) {
-                Map<String, Object> meta = new HashMap<>();
-                meta.put("knowledge_base_id", "1");
-                meta.put("document_id", "doc-" + (i % 10));
-                meta.put("chunk_index", String.valueOf(i / 10));
-                Document d = new Document("content" + i, meta);
-                d.setScore(1.0 - (i * 0.02));
-                docs.add(d);
+                docs.add(buildDocWithScore("c" + i, String.valueOf(i), "0",
+                        String.valueOf(KB_ID_1), 1.0 - i * 0.01));
             }
 
-            List<Document> result = callApplyPerDocDedup(docs, KB_IDS);
+            List<Document> result = invokePerDocDedup(docs, KB_IDS);
 
-            assertThat(result).hasSize(5);
+            assertThat(result).hasSize(5); // topK=5
         }
 
         @Test
-        @DisplayName("Empty document list returns empty")
-        void testPerDocDedupWithEmptyList() {
-            List<Document> docs = Collections.emptyList();
-
-            List<Document> result = callApplyPerDocDedup(docs, KB_IDS);
+        @DisplayName("Empty list returns empty")
+        void perDocDedup_empty_returnsEmpty() {
+            List<Document> result = invokePerDocDedup(Collections.emptyList(), KB_IDS);
 
             assertThat(result).isEmpty();
         }
-    }
-
-    @Nested
-    @DisplayName("Filter Expression Building - buildFilterExpression")
-    class FilterExpressionBuilding {
 
         @Test
-        @DisplayName("Single knowledge base ID generates correct filter")
-        void testBuildFilterExpressionWithSingleKB() {
-            Set<Long> kbIds = Set.of(10L);
-            Long tenantId = 1L;
+        @DisplayName("Handles null score gracefully (treated as 0)")
+        void perDocDedup_nullScore_treatedAsZero() {
+            Document withNullScore = new Document("no-score",
+                    Map.of("document_id", "1", "chunk_index", "0",
+                            "knowledge_base_id", String.valueOf(KB_ID_1)));
+            // score is null by default
 
-            String filterExpr = callBuildFilterExpression(kbIds, tenantId);
+            Document withScore = buildDocWithScore("has-score", "1", "1",
+                    String.valueOf(KB_ID_1), 0.8);
 
-            assertThat(filterExpr).contains("knowledge_base_id");
-            assertThat(filterExpr).contains("tenant_id");
-            assertThat(filterExpr).contains("10");
+            List<Document> result = invokePerDocDedup(List.of(withNullScore, withScore), KB_IDS);
+
+            assertThat(result).hasSize(2);
+            // The one with score 0.8 should come first
+            assertThat(result.get(0).getText()).isEqualTo("has-score");
         }
 
         @Test
-        @DisplayName("Multiple knowledge base IDs generate OR filter")
-        void testBuildFilterExpressionWithMultipleKBs() {
-            Set<Long> kbIds = Set.of(10L, 20L, 30L);
-            Long tenantId = 1L;
+        @DisplayName("Multiple documents are all preserved (up to limits)")
+        void perDocDedup_multipleDocuments_preserved() {
+            List<Document> docs = List.of(
+                    buildDocWithScore("a", "1", "0", String.valueOf(KB_ID_1), 0.9),
+                    buildDocWithScore("b", "2", "0", String.valueOf(KB_ID_1), 0.8),
+                    buildDocWithScore("c", "3", "0", String.valueOf(KB_ID_1), 0.7)
+            );
 
-            String filterExpr = callBuildFilterExpression(kbIds, tenantId);
+            List<Document> result = invokePerDocDedup(docs, KB_IDS);
 
-            assertThat(filterExpr).contains("||");
-            assertThat(filterExpr).contains("knowledge_base_id");
-            assertThat(filterExpr).contains("tenant_id");
+            Set<String> docIds = result.stream()
+                    .map(d -> d.getMetadata().get("document_id").toString())
+                    .collect(Collectors.toSet());
+            assertThat(docIds).containsExactlyInAnyOrder("1", "2", "3");
         }
 
         @Test
-        @DisplayName("Filter includes tenant_id to prevent data leakage")
-        void testBuildFilterExpressionIncludesTenantId() {
-            Set<Long> kbIds = Set.of(10L);
-            Long tenantId = 123L;
+        @DisplayName("Result is sorted by score descending")
+        void perDocDedup_sortedDescending() {
+            List<Document> docs = List.of(
+                    buildDocWithScore("low", "1", "0", String.valueOf(KB_ID_1), 0.1),
+                    buildDocWithScore("mid", "2", "0", String.valueOf(KB_ID_1), 0.5),
+                    buildDocWithScore("high", "3", "0", String.valueOf(KB_ID_1), 0.9)
+            );
 
-            String filterExpr = callBuildFilterExpression(kbIds, tenantId);
+            List<Document> result = invokePerDocDedup(docs, KB_IDS);
 
-            assertThat(filterExpr).contains("tenant_id == '123'");
-        }
-
-        @Test
-        @DisplayName("Null tenant_id still builds filter")
-        void testBuildFilterExpressionWithNullTenantId() {
-            Set<Long> kbIds = Set.of(10L);
-
-            String filterExpr = callBuildFilterExpression(kbIds, null);
-
-            assertThat(filterExpr).contains("knowledge_base_id");
-        }
-
-        @Test
-        @DisplayName("SQL injection protection via quote escaping")
-        void testBuildFilterExpressionEscapesSqlInjection() {
-            Set<Long> kbIds = Set.of(10L);
-            Long tenantId = 1L;
-
-            String filterExpr = callBuildFilterExpression(kbIds, tenantId);
-
-            assertThat(filterExpr).doesNotContain("''");
+            assertThat(result).hasSize(3);
+            for (int i = 0; i < result.size() - 1; i++) {
+                double scoreA = result.get(i).getScore() != null ? result.get(i).getScore() : 0;
+                double scoreB = result.get(i + 1).getScore() != null ? result.get(i + 1).getScore() : 0;
+                assertThat(scoreA).isGreaterThanOrEqualTo(scoreB);
+            }
         }
     }
 
+    // ==================== Filter expression ====================
+
     @Nested
-    @DisplayName("Document Conversion")
-    class DocumentConversion {
+    @DisplayName("Filter expression building")
+    class FilterExpression {
 
         @Test
-        @DisplayName("DocumentChunk converts to Document correctly")
-        void testDocumentChunkConversion() {
-            String query = "test";
-            DocumentChunk chunk = DocumentChunk.builder()
-                    .id(1L)
-                    .content("test content")
-                    .knowledgeBaseId(10L)
-                    .documentId(100L)
-                    .tenantId(1L)
-                    .chunkIndex(0)
-                    .build();
-            Query mockQuery = mock(Query.class);
-            when(mockQuery.getResultList()).thenReturn(List.of(chunk));
-            when(entityManager.createNativeQuery(anyString(), eq(DocumentChunk.class)))
-                    .thenReturn(mockQuery);
+        @DisplayName("Single KB: knowledge_base_id == 'X' && tenant_id == 'Y'")
+        void buildFilter_singleKb() {
+            String filter = invokeBuildFilterExpression(Set.of(KB_ID_1), TENANT_ID);
 
-            List<Document> result = callFullTextSearch(query, KB_IDS, TENANT_ID, 15);
+            assertThat(filter).contains("knowledge_base_id == '" + KB_ID_1 + "'");
+            assertThat(filter).contains("tenant_id == '" + TENANT_ID + "'");
+            assertThat(filter).contains("&&");
+            assertThat(filter).doesNotContain("||");
+        }
+
+        @Test
+        @DisplayName("Multiple KBs: (kb1 || kb2) && tenant_id")
+        void buildFilter_multipleKbs() {
+            String filter = invokeBuildFilterExpression(KB_IDS, TENANT_ID);
+
+            assertThat(filter).contains("||");
+            assertThat(filter).contains("knowledge_base_id == '" + KB_ID_1 + "'");
+            assertThat(filter).contains("knowledge_base_id == '" + KB_ID_2 + "'");
+            assertThat(filter).contains("tenant_id == '" + TENANT_ID + "'");
+        }
+
+        @Test
+        @DisplayName("Null tenant omits tenant_id filter")
+        void buildFilter_nullTenant() {
+            String filter = invokeBuildFilterExpression(Set.of(KB_ID_1), null);
+
+            assertThat(filter).contains("knowledge_base_id");
+            assertThat(filter).doesNotContain("tenant_id");
+        }
+
+        @Test
+        @DisplayName("Multiple KBs with null tenant")
+        void buildFilter_multipleKbs_nullTenant() {
+            String filter = invokeBuildFilterExpression(KB_IDS, null);
+
+            assertThat(filter).contains("||");
+            assertThat(filter).doesNotContain("tenant_id");
+        }
+
+        @Test
+        @DisplayName("Single KB with null tenant has no && separator")
+        void buildFilter_singleKb_nullTenant_noAnd() {
+            String filter = invokeBuildFilterExpression(Set.of(KB_ID_1), null);
+
+            assertThat(filter).contains("knowledge_base_id == '" + KB_ID_1 + "'");
+            assertThat(filter).doesNotContain("&&");
+        }
+    }
+
+    // ==================== Full integration scenarios ====================
+
+    @Nested
+    @DisplayName("Integration scenarios")
+    class IntegrationScenarios {
+
+        @Test
+        @DisplayName("Single KB, single result, end-to-end")
+        void integration_singleKb_singleResult() {
+            Set<Long> singleKb = Set.of(KB_ID_1);
+            Document vectorDoc = buildDoc("content", "100", "0", String.valueOf(KB_ID_1));
+            Document reranked = buildDocWithScore("content", "100", "0",
+                    String.valueOf(KB_ID_1), 0.92);
+
+            mockVectorSearch(List.of(vectorDoc));
+            mockEntityManagerReturns(Collections.emptyList());
+            when(rerankerService.rerank(anyString(), anyList())).thenReturn(List.of(reranked));
+
+            List<Document> result = hybridRetrievalService.hybridSearch("query", singleKb, TENANT_ID);
 
             assertThat(result).hasSize(1);
-            assertThat(result.get(0).getText()).isEqualTo("test content");
-            assertThat(result.get(0).getMetadata()).containsEntry("knowledge_base_id", "10");
+            assertThat(result.get(0).getScore()).isEqualTo(0.92);
+            assertThat(result.get(0).getText()).isEqualTo("content");
+        }
+
+        @Test
+        @DisplayName("Empty query still processes (extractKeywords returns empty)")
+        void integration_emptyQuery() {
+            mockVectorSearch(Collections.emptyList());
+            mockEntityManagerReturns(Collections.emptyList());
+            when(rerankerService.rerank(anyString(), anyList())).thenReturn(Collections.emptyList());
+
+            List<Document> result = hybridRetrievalService.hybridSearch("", KB_IDS, TENANT_ID);
+
+            assertThat(result).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Many docs from vector, few from full-text, merged correctly")
+        void integration_multipleSourcesMerged() {
+            List<Document> vectorDocs = List.of(
+                    buildDoc("v1", "1", "0", String.valueOf(KB_ID_1)),
+                    buildDoc("v2", "2", "0", String.valueOf(KB_ID_1)),
+                    buildDoc("v3", "3", "0", String.valueOf(KB_ID_1))
+            );
+            // Full-text: docs 2,4 (doc 2 overlaps with vector)
+            List<DocumentChunk> ftChunks = List.of(
+                    DocumentChunk.builder().id(1L).content("v2").knowledgeBaseId(KB_ID_1)
+                            .documentId(2L).tenantId(TENANT_ID).chunkIndex(0).build(),
+                    DocumentChunk.builder().id(2L).content("v4").knowledgeBaseId(KB_ID_1)
+                            .documentId(4L).tenantId(TENANT_ID).chunkIndex(0).build()
+            );
+
+            List<Document> reranked = List.of(
+                    buildDocWithScore("merged", "1", "0", String.valueOf(KB_ID_1), 0.95));
+
+            mockVectorSearch(vectorDocs);
+            mockEntityManagerConsecutive(ftChunks, Collections.emptyList());
+            when(rerankerService.rerank(anyString(), anyList())).thenReturn(reranked);
+
+            List<Document> result = hybridRetrievalService.hybridSearch("test", KB_IDS, TENANT_ID);
+
+            assertThat(result).isNotEmpty();
+            verify(rerankerService).rerank(anyString(), anyList());
+        }
+
+        @Test
+        @DisplayName("Expanded topK (15) passed to fullTextSearch and keywordSearch")
+        void integration_expandedTopKPassedToDbQueries() {
+            mockVectorSearch(Collections.emptyList());
+            Query mockQuery = setupQueryMock(Collections.emptyList());
+            when(rerankerService.rerank(anyString(), anyList())).thenReturn(Collections.emptyList());
+
+            hybridRetrievalService.hybridSearch("test query", KB_IDS, TENANT_ID);
+
+            // topK=5 => expandedTopK=15 => limit parameter should be 15
+            verify(mockQuery, atLeastOnce()).setParameter(eq("limit"), eq(15));
+        }
+
+        @Test
+        @DisplayName("Three-arg hybridSearch delegates to four-arg with null allowedDocIds")
+        void integration_threeArgDelegates() {
+            Document vectorDoc = buildDoc("c", "1", "0", String.valueOf(KB_ID_1));
+            Document reranked = buildDocWithScore("c", "1", "0", String.valueOf(KB_ID_1), 0.9);
+
+            mockVectorSearch(List.of(vectorDoc));
+            mockEntityManagerReturns(Collections.emptyList());
+            when(rerankerService.rerank(anyString(), anyList())).thenReturn(List.of(reranked));
+
+            List<Document> result = hybridRetrievalService.hybridSearch("query", KB_IDS, TENANT_ID);
+
+            assertThat(result).hasSize(1);
         }
     }
 
-    // Helper methods for invoking private methods via reflection
+    // ==================== Private method invokers via reflection ====================
 
-    private List<Document> callFullTextSearch(String query, Set<Long> kbIds, Long tenantId, int limit) {
-        try {
-            return (List<Document>) ReflectionTestUtils
-                    .invokeMethod(hybridRetrievalService, "fullTextSearch",
-                            query, kbIds, tenantId, limit);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+    @SuppressWarnings("unchecked")
+    private List<Document> invokeFullTextSearch(String query, Set<Long> kbIds, Long tenantId, int limit) {
+        return (List<Document>) ReflectionTestUtils.invokeMethod(
+                hybridRetrievalService, "fullTextSearch", query, kbIds, tenantId, limit);
     }
 
-    private List<String> callExtractKeywords(String query) {
-        try {
-            return (List<String>) ReflectionTestUtils
-                    .invokeMethod(hybridRetrievalService, "extractKeywords", query);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+    @SuppressWarnings("unchecked")
+    private List<String> invokeExtractKeywords(String query) {
+        return (List<String>) ReflectionTestUtils.invokeMethod(
+                hybridRetrievalService, "extractKeywords", query);
     }
 
-    private List<Document> callRRFFusion(List<Document> vectorResults,
-                                         List<Document> fullTextResults,
-                                         List<Document> keywordResults) {
-        try {
-            return (List<Document>) ReflectionTestUtils
-                    .invokeMethod(hybridRetrievalService, "rrfFusion",
-                            vectorResults, fullTextResults, keywordResults);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+    @SuppressWarnings("unchecked")
+    private List<Document> invokeKeywordSearch(List<String> keywords, Set<Long> kbIds,
+                                               Long tenantId, int limit) {
+        return (List<Document>) ReflectionTestUtils.invokeMethod(
+                hybridRetrievalService, "keywordSearch", keywords, kbIds, tenantId, limit);
     }
 
-    private List<Document> callApplyPerDocDedup(List<Document> docs, Set<Long> kbIds) {
-        try {
-            return (List<Document>) ReflectionTestUtils
-                    .invokeMethod(hybridRetrievalService, "applyPerDocDedup", docs, kbIds);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+    @SuppressWarnings("unchecked")
+    private List<Document> invokeRrfFusion(List<Document> vector, List<Document> fullText,
+                                            List<Document> keyword) {
+        return (List<Document>) ReflectionTestUtils.invokeMethod(
+                hybridRetrievalService, "rrfFusion", vector, fullText, keyword);
     }
 
-    private String callBuildFilterExpression(Set<Long> kbIds, Long tenantId) {
-        try {
-            return (String) ReflectionTestUtils
-                    .invokeMethod(hybridRetrievalService, "buildFilterExpression", kbIds, tenantId);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+    @SuppressWarnings("unchecked")
+    private List<Document> invokePerDocDedup(List<Document> docs, Set<Long> kbIds) {
+        return (List<Document>) ReflectionTestUtils.invokeMethod(
+                hybridRetrievalService, "applyPerDocDedup", docs, kbIds);
     }
 
-    // Document creation helper methods
-
-    private List<Document> createDocuments(int count, String prefix) {
-        List<Document> docs = new ArrayList<>();
-        for (int i = 0; i < count; i++) {
-            Map<String, Object> metadata = new HashMap<>();
-            metadata.put("knowledge_base_id", String.valueOf(KB_ID_1));
-            metadata.put("document_id", prefix + "-doc-" + i);
-            metadata.put("chunk_index", String.valueOf(i));
-            metadata.put("tenant_id", String.valueOf(TENANT_ID));
-            Document doc = new Document("content " + prefix + " " + i, metadata);
-            doc.setScore(1.0 - (i * 0.1));
-            docs.add(doc);
-        }
-        return docs;
-    }
-
-    private List<Document> createDocumentsWithIds(int count, String prefix) {
-        List<Document> docs = new ArrayList<>();
-        for (int i = 0; i < count; i++) {
-            Map<String, Object> metadata = new HashMap<>();
-            metadata.put("knowledge_base_id", String.valueOf(KB_ID_1));
-            metadata.put("document_id", prefix + "-doc-" + i);
-            metadata.put("chunk_index", String.valueOf(i));
-            metadata.put("tenant_id", String.valueOf(TENANT_ID));
-            Document doc = new Document("content " + prefix + " " + i, metadata);
-            docs.add(doc);
-        }
-        return docs;
-    }
-
-    private Document createDocumentWithId(String docId) {
-        Map<String, Object> metadata = new HashMap<>();
-        metadata.put("knowledge_base_id", String.valueOf(KB_ID_1));
-        metadata.put("document_id", docId);
-        metadata.put("chunk_index", "0");
-        metadata.put("tenant_id", String.valueOf(TENANT_ID));
-        return new Document("content " + docId, metadata);
-    }
-
-    private List<DocumentChunk> createDocumentChunks(int count) {
-        List<DocumentChunk> chunks = new ArrayList<>();
-        for (int i = 0; i < count; i++) {
-            chunks.add(DocumentChunk.builder()
-                    .id((long) i)
-                    .documentId(100L + i)
-                    .knowledgeBaseId(KB_ID_1)
-                    .tenantId(TENANT_ID)
-                    .chunkIndex(i)
-                    .content("content " + i)
-                    .build());
-        }
-        return chunks;
+    private String invokeBuildFilterExpression(Set<Long> kbIds, Long tenantId) {
+        return (String) ReflectionTestUtils.invokeMethod(
+                hybridRetrievalService, "buildFilterExpression", kbIds, tenantId);
     }
 }

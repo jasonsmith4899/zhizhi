@@ -1,17 +1,16 @@
 package com.zhizhi.ai.service;
 
 import com.zhizhi.ai.common.BusinessException;
+import com.zhizhi.ai.model.dto.TenantUpdateRequest;
 import com.zhizhi.ai.model.entity.Tenant;
 import com.zhizhi.ai.model.entity.TenantMember;
 import com.zhizhi.ai.model.entity.User;
 import com.zhizhi.ai.repository.TenantMemberRepository;
 import com.zhizhi.ai.repository.TenantRepository;
 import com.zhizhi.ai.repository.UserRepository;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -19,221 +18,267 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 import java.util.Optional;
 
-import static org.assertj.core.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("TenantService 单元测试")
 class TenantServiceTest {
+
+    @Mock
+    private TenantRepository tenantRepository;
+    @Mock
+    private TenantMemberRepository tenantMemberRepository;
+    @Mock
+    private UserRepository userRepository;
 
     @InjectMocks
     private TenantService tenantService;
 
-    @Mock
-    private TenantRepository tenantRepository;
+    // ---------- create ----------
 
-    @Mock
-    private TenantMemberRepository tenantMemberRepository;
+    @Test
+    void create_success() {
+        User user = User.builder().id(1L).username("alice").build();
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
 
-    @Mock
-    private UserRepository userRepository;
+        Tenant savedTenant = Tenant.builder().id(10L).name("Acme").build();
+        when(tenantRepository.save(any(Tenant.class))).thenReturn(savedTenant);
+        when(tenantMemberRepository.save(any(TenantMember.class))).thenReturn(null);
 
-    private User testUser;
-    private Tenant testTenant;
-    private TenantMember ownerMember;
-    private final Long USER_ID = 1L;
-    private final Long OTHER_USER_ID = 2L;
-    private final Long TENANT_ID = 1L;
+        Tenant result = tenantService.create("Acme", 1L);
 
-    @BeforeEach
-    void setUp() {
-        testUser = User.builder().id(USER_ID).username("testuser").build();
+        assertEquals(10L, result.getId());
+        assertEquals("Acme", result.getName());
 
-        testTenant = Tenant.builder()
-                .id(TENANT_ID)
-                .name("测试商户")
-                .plan("free")
-                .status("active")
-                .maxDocuments(10)
-                .maxDailyQueries(100)
-                .build();
+        ArgumentCaptor<Tenant> tenantCaptor = ArgumentCaptor.forClass(Tenant.class);
+        verify(tenantRepository).save(tenantCaptor.capture());
+        assertEquals("Acme", tenantCaptor.getValue().getName());
 
-        ownerMember = TenantMember.builder()
-                .id(1L)
-                .tenantId(TENANT_ID)
-                .userId(USER_ID)
-                .role("owner")
-                .build();
+        ArgumentCaptor<TenantMember> memberCaptor = ArgumentCaptor.forClass(TenantMember.class);
+        verify(tenantMemberRepository).save(memberCaptor.capture());
+        assertEquals(10L, memberCaptor.getValue().getTenantId());
+        assertEquals(1L, memberCaptor.getValue().getUserId());
+        assertEquals("owner", memberCaptor.getValue().getRole());
     }
 
-    @Nested
-    @DisplayName("创建租户")
-    class Create {
+    @Test
+    void create_userNotFound_throws() {
+        when(userRepository.findById(99L)).thenReturn(Optional.empty());
 
-        @Test
-        @DisplayName("创建成功，创建者自动成为owner")
-        void create_success() {
-            when(userRepository.findById(USER_ID)).thenReturn(Optional.of(testUser));
-            when(tenantRepository.save(any(Tenant.class))).thenReturn(testTenant);
-            when(tenantMemberRepository.save(any(TenantMember.class))).thenReturn(ownerMember);
-
-            Tenant result = tenantService.create("测试商户", USER_ID);
-
-            assertThat(result).isNotNull();
-            assertThat(result.getName()).isEqualTo("测试商户");
-            verify(tenantRepository).save(any(Tenant.class));
-            verify(tenantMemberRepository).save(any(TenantMember.class));
-        }
-
-        @Test
-        @DisplayName("用户不存在")
-        void create_userNotFound() {
-            when(userRepository.findById(999L)).thenReturn(Optional.empty());
-
-            assertThatThrownBy(() -> tenantService.create("测试商户", 999L))
-                    .isInstanceOf(BusinessException.class)
-                    .satisfies(e -> assertThat(((BusinessException) e).getCode()).isEqualTo(404));
-        }
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> tenantService.create("Acme", 99L));
+        assertEquals(404, ex.getCode());
+        assertTrue(ex.getMessage().contains("用户"));
     }
 
-    @Nested
-    @DisplayName("获取租户")
-    class GetById {
+    // ---------- getByUserId ----------
 
-        @Test
-        @DisplayName("获取成功")
-        void getById_success() {
-            when(tenantRepository.findById(TENANT_ID)).thenReturn(Optional.of(testTenant));
+    @Test
+    void getByUserId_success() {
+        TenantMember member = TenantMember.builder().tenantId(10L).userId(1L).build();
+        when(tenantMemberRepository.findByUserId(1L)).thenReturn(Optional.of(member));
 
-            Tenant result = tenantService.getById(TENANT_ID);
+        Tenant tenant = Tenant.builder().id(10L).name("Acme").build();
+        when(tenantRepository.findById(10L)).thenReturn(Optional.of(tenant));
 
-            assertThat(result.getName()).isEqualTo("测试商户");
-        }
-
-        @Test
-        @DisplayName("租户不存在")
-        void getById_notFound() {
-            when(tenantRepository.findById(999L)).thenReturn(Optional.empty());
-
-            assertThatThrownBy(() -> tenantService.getById(999L))
-                    .isInstanceOf(BusinessException.class);
-        }
+        Tenant result = tenantService.getByUserId(1L);
+        assertEquals("Acme", result.getName());
     }
 
-    @Nested
-    @DisplayName("获取用户租户")
-    class GetByUserId {
+    @Test
+    void getByUserId_noMembership_throws() {
+        when(tenantMemberRepository.findByUserId(1L)).thenReturn(Optional.empty());
 
-        @Test
-        @DisplayName("通过用户ID获取租户")
-        void getByUserId_success() {
-            when(tenantMemberRepository.findByUserId(USER_ID)).thenReturn(Optional.of(ownerMember));
-            when(tenantRepository.findById(TENANT_ID)).thenReturn(Optional.of(testTenant));
-
-            Tenant result = tenantService.getByUserId(USER_ID);
-
-            assertThat(result.getName()).isEqualTo("测试商户");
-        }
-
-        @Test
-        @DisplayName("用户无租户")
-        void getByUserId_noMember() {
-            when(tenantMemberRepository.findByUserId(USER_ID)).thenReturn(Optional.empty());
-
-            assertThatThrownBy(() -> tenantService.getByUserId(USER_ID))
-                    .isInstanceOf(BusinessException.class);
-        }
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> tenantService.getByUserId(1L));
+        assertEquals(404, ex.getCode());
     }
 
-    @Nested
-    @DisplayName("添加成员")
-    class AddMember {
+    @Test
+    void getByUserId_tenantNotFound_throws() {
+        TenantMember member = TenantMember.builder().tenantId(10L).userId(1L).build();
+        when(tenantMemberRepository.findByUserId(1L)).thenReturn(Optional.of(member));
+        when(tenantRepository.findById(10L)).thenReturn(Optional.empty());
 
-        @Test
-        @DisplayName("添加成功")
-        void addMember_success() {
-            User newUser = User.builder().id(OTHER_USER_ID).username("newuser").build();
-            when(tenantMemberRepository.findByTenantIdAndUserId(TENANT_ID, USER_ID))
-                    .thenReturn(Optional.of(ownerMember));
-            when(userRepository.findByUsername("newuser")).thenReturn(Optional.of(newUser));
-            when(tenantMemberRepository.existsByTenantIdAndUserId(TENANT_ID, OTHER_USER_ID))
-                    .thenReturn(false);
-            when(tenantMemberRepository.save(any(TenantMember.class)))
-                    .thenReturn(TenantMember.builder().id(2L).tenantId(TENANT_ID).userId(OTHER_USER_ID).role("member").build());
-
-            TenantMember result = tenantService.addMember(TENANT_ID, "newuser", "member", USER_ID);
-
-            assertThat(result).isNotNull();
-            assertThat(result.getRole()).isEqualTo("member");
-            verify(tenantMemberRepository).save(any(TenantMember.class));
-        }
-
-        @Test
-        @DisplayName("重复添加")
-        void addMember_duplicate() {
-            when(tenantMemberRepository.findByTenantIdAndUserId(TENANT_ID, USER_ID))
-                    .thenReturn(Optional.of(ownerMember));
-            when(userRepository.findByUsername("newuser")).thenReturn(Optional.of(testUser));
-            when(tenantMemberRepository.existsByTenantIdAndUserId(TENANT_ID, USER_ID))
-                    .thenReturn(true);
-
-            assertThatThrownBy(() -> tenantService.addMember(TENANT_ID, "newuser", "member", USER_ID))
-                    .isInstanceOf(BusinessException.class)
-                    .satisfies(e -> assertThat(((BusinessException) e).getCode()).isEqualTo(400));
-        }
-
-        @Test
-        @DisplayName("非管理员无权添加")
-        void addMember_forbidden() {
-            TenantMember memberRole = TenantMember.builder()
-                    .tenantId(TENANT_ID).userId(OTHER_USER_ID).role("member").build();
-            when(tenantMemberRepository.findByTenantIdAndUserId(TENANT_ID, OTHER_USER_ID))
-                    .thenReturn(Optional.of(memberRole));
-
-            assertThatThrownBy(() -> tenantService.addMember(TENANT_ID, "newuser", "member", OTHER_USER_ID))
-                    .isInstanceOf(BusinessException.class)
-                    .satisfies(e -> assertThat(((BusinessException) e).getCode()).isEqualTo(403));
-        }
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> tenantService.getByUserId(1L));
+        assertEquals(404, ex.getCode());
     }
 
-    @Nested
-    @DisplayName("成员检查")
-    class IsMember {
+    // ---------- getById ----------
 
-        @Test
-        @DisplayName("是成员")
-        void isMember_true() {
-            when(tenantMemberRepository.existsByTenantIdAndUserId(TENANT_ID, USER_ID)).thenReturn(true);
+    @Test
+    void getById_success() {
+        Tenant tenant = Tenant.builder().id(10L).name("Acme").build();
+        when(tenantRepository.findById(10L)).thenReturn(Optional.of(tenant));
 
-            assertThat(tenantService.isMember(TENANT_ID, USER_ID)).isTrue();
-        }
-
-        @Test
-        @DisplayName("不是成员")
-        void isMember_false() {
-            when(tenantMemberRepository.existsByTenantIdAndUserId(TENANT_ID, OTHER_USER_ID)).thenReturn(false);
-
-            assertThat(tenantService.isMember(TENANT_ID, OTHER_USER_ID)).isFalse();
-        }
+        Tenant result = tenantService.getById(10L);
+        assertEquals("Acme", result.getName());
     }
 
-    @Nested
-    @DisplayName("获取成员列表")
-    class GetMembers {
+    @Test
+    void getById_notFound_throws() {
+        when(tenantRepository.findById(99L)).thenReturn(Optional.empty());
 
-        @Test
-        @DisplayName("获取成功")
-        void getMembers_success() {
-            when(tenantMemberRepository.findByTenantIdAndUserId(TENANT_ID, USER_ID))
-                    .thenReturn(Optional.of(ownerMember));
-            when(tenantMemberRepository.findByTenantId(TENANT_ID))
-                    .thenReturn(List.of(ownerMember));
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> tenantService.getById(99L));
+        assertEquals(404, ex.getCode());
+    }
 
-            List<TenantMember> result = tenantService.getMembers(TENANT_ID, USER_ID);
+    // ---------- update ----------
 
-            assertThat(result).hasSize(1);
-            assertThat(result.get(0).getRole()).isEqualTo("owner");
-        }
+    @Test
+    void update_success() {
+        TenantMember operatorMember = TenantMember.builder().tenantId(10L).userId(1L).role("owner").build();
+        when(tenantMemberRepository.findByTenantIdAndUserId(10L, 1L)).thenReturn(Optional.of(operatorMember));
+
+        Tenant existing = Tenant.builder().id(10L).name("OldName").build();
+        when(tenantRepository.findById(10L)).thenReturn(Optional.of(existing));
+        when(tenantRepository.save(any(Tenant.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        TenantUpdateRequest req = new TenantUpdateRequest();
+        req.setName("NewName");
+
+        Tenant result = tenantService.update(10L, req, 1L);
+        assertEquals("NewName", result.getName());
+        verify(tenantRepository).save(any(Tenant.class));
+    }
+
+    @Test
+    void update_updatesWechatAppId() {
+        TenantMember operatorMember = TenantMember.builder().tenantId(10L).userId(1L).role("admin").build();
+        when(tenantMemberRepository.findByTenantIdAndUserId(10L, 1L)).thenReturn(Optional.of(operatorMember));
+
+        Tenant existing = Tenant.builder().id(10L).name("Acme").build();
+        when(tenantRepository.findById(10L)).thenReturn(Optional.of(existing));
+        when(tenantRepository.save(any(Tenant.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        TenantUpdateRequest req = new TenantUpdateRequest();
+        req.setWechatAppId("wx123456");
+
+        Tenant result = tenantService.update(10L, req, 1L);
+        assertEquals("wx123456", result.getWechatAppid());
+    }
+
+    @Test
+    void update_noPermission_throws() {
+        when(tenantMemberRepository.findByTenantIdAndUserId(10L, 1L)).thenReturn(Optional.empty());
+
+        TenantUpdateRequest req = new TenantUpdateRequest();
+        req.setName("NewName");
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> tenantService.update(10L, req, 1L));
+        assertEquals(403, ex.getCode());
+    }
+
+    @Test
+    void update_memberRoleNotAdmin_throws() {
+        TenantMember member = TenantMember.builder().tenantId(10L).userId(1L).role("member").build();
+        when(tenantMemberRepository.findByTenantIdAndUserId(10L, 1L)).thenReturn(Optional.of(member));
+
+        TenantUpdateRequest req = new TenantUpdateRequest();
+        req.setName("NewName");
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> tenantService.update(10L, req, 1L));
+        assertEquals(403, ex.getCode());
+        assertTrue(ex.getMessage().contains("管理员"));
+    }
+
+    // ---------- addMember ----------
+
+    @Test
+    void addMember_success() {
+        TenantMember operatorMember = TenantMember.builder().tenantId(10L).userId(1L).role("owner").build();
+        when(tenantMemberRepository.findByTenantIdAndUserId(10L, 1L)).thenReturn(Optional.of(operatorMember));
+
+        User newUser = User.builder().id(2L).username("bob").build();
+        when(userRepository.findByUsername("bob")).thenReturn(Optional.of(newUser));
+        when(tenantMemberRepository.existsByTenantIdAndUserId(10L, 2L)).thenReturn(false);
+        when(tenantMemberRepository.save(any(TenantMember.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        TenantMember result = tenantService.addMember(10L, "bob", "admin", 1L);
+
+        assertEquals(10L, result.getTenantId());
+        assertEquals(2L, result.getUserId());
+        assertEquals("admin", result.getRole());
+    }
+
+    @Test
+    void addMember_userNotFound_throws() {
+        TenantMember operatorMember = TenantMember.builder().tenantId(10L).userId(1L).role("owner").build();
+        when(tenantMemberRepository.findByTenantIdAndUserId(10L, 1L)).thenReturn(Optional.of(operatorMember));
+        when(userRepository.findByUsername("ghost")).thenReturn(Optional.empty());
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> tenantService.addMember(10L, "ghost", "member", 1L));
+        assertEquals(404, ex.getCode());
+        assertTrue(ex.getMessage().contains("用户"));
+    }
+
+    @Test
+    void addMember_alreadyMember_throws() {
+        TenantMember operatorMember = TenantMember.builder().tenantId(10L).userId(1L).role("owner").build();
+        when(tenantMemberRepository.findByTenantIdAndUserId(10L, 1L)).thenReturn(Optional.of(operatorMember));
+
+        User existingUser = User.builder().id(2L).username("bob").build();
+        when(userRepository.findByUsername("bob")).thenReturn(Optional.of(existingUser));
+        when(tenantMemberRepository.existsByTenantIdAndUserId(10L, 2L)).thenReturn(true);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> tenantService.addMember(10L, "bob", "member", 1L));
+        assertEquals(400, ex.getCode());
+        assertTrue(ex.getMessage().contains("已经是租户成员"));
+    }
+
+    @Test
+    void addMember_noPermission_throws() {
+        when(tenantMemberRepository.findByTenantIdAndUserId(10L, 1L)).thenReturn(Optional.empty());
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> tenantService.addMember(10L, "bob", "member", 1L));
+        assertEquals(403, ex.getCode());
+    }
+
+    // ---------- getMembers ----------
+
+    @Test
+    void getMembers_success() {
+        TenantMember operatorMember = TenantMember.builder().tenantId(10L).userId(1L).role("owner").build();
+        when(tenantMemberRepository.findByTenantIdAndUserId(10L, 1L)).thenReturn(Optional.of(operatorMember));
+
+        List<TenantMember> members = List.of(
+                TenantMember.builder().tenantId(10L).userId(1L).role("owner").build(),
+                TenantMember.builder().tenantId(10L).userId(2L).role("member").build()
+        );
+        when(tenantMemberRepository.findByTenantId(10L)).thenReturn(members);
+
+        List<TenantMember> result = tenantService.getMembers(10L, 1L);
+        assertEquals(2, result.size());
+    }
+
+    @Test
+    void getMembers_noPermission_throws() {
+        when(tenantMemberRepository.findByTenantIdAndUserId(10L, 99L)).thenReturn(Optional.empty());
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> tenantService.getMembers(10L, 99L));
+        assertEquals(403, ex.getCode());
+    }
+
+    // ---------- isMember ----------
+
+    @Test
+    void isMember_true() {
+        when(tenantMemberRepository.existsByTenantIdAndUserId(10L, 1L)).thenReturn(true);
+        assertTrue(tenantService.isMember(10L, 1L));
+    }
+
+    @Test
+    void isMember_false() {
+        when(tenantMemberRepository.existsByTenantIdAndUserId(10L, 99L)).thenReturn(false);
+        assertFalse(tenantService.isMember(10L, 99L));
     }
 }

@@ -104,6 +104,12 @@ request.interceptors.response.use(
       }
     }
 
+    // 记录后端返回的 traceId，便于用户报障时提供给排查
+    const traceId = error.response?.headers?.['x-trace-id']
+    if (traceId) {
+      console.error(`[请求失败] traceId=${traceId}`, error.config?.url)
+    }
+
     ElMessage.error(error.response?.data?.message || '网络错误')
     return Promise.reject(error)
   }

@@ -145,4 +145,34 @@ class GlobalExceptionHandlerTest {
 
         assertEquals(500, response.getStatusCode().value());
     }
+
+    // ---------- 日志增强后行为不变验证 ----------
+
+    @Test
+    @DisplayName("校验异常记录日志但返回体不变")
+    void handleValidationStillReturnsBadRequest() throws Exception {
+        org.springframework.core.MethodParameter mp = mock(org.springframework.core.MethodParameter.class);
+        org.springframework.validation.BindingResult br = mock(org.springframework.validation.BindingResult.class);
+        when(br.getFieldErrors()).thenReturn(java.util.List.of(
+                new FieldError("obj", "username", "不能为空")));
+        MethodArgumentNotValidException ex = new MethodArgumentNotValidException(mp, br);
+
+        ResponseEntity<Result<Void>> response = handler.handleValidation(ex);
+
+        assertEquals(400, response.getStatusCode().value());
+        assertNotNull(response.getBody());
+        assertEquals("不能为空", response.getBody().getMessage());
+    }
+
+    @Test
+    @DisplayName("通用异常返回 500 且不泄露内部细节")
+    void handleGeneralReturns500() {
+        ResponseEntity<Result<Void>> response =
+                handler.handleGeneral(new RuntimeException("internal db error xyz"));
+
+        assertEquals(500, response.getStatusCode().value());
+        assertNotNull(response.getBody());
+        assertEquals("系统内部错误，请稍后重试", response.getBody().getMessage());
+        assertFalse(response.getBody().getMessage().contains("xyz"));
+    }
 }

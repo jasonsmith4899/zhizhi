@@ -76,6 +76,9 @@ app:
     expiration: 7200000         # 2小时 (access token)
     refresh-expiration: 604800000  # 7天 (refresh token)
 
+  log:
+    slow-request-ms: 2000       # 慢请求阈值（毫秒），超过则记 warn
+
   ai:
     max-context-messages: 10
     max-context-tokens: 4000
@@ -117,5 +120,5 @@ app:
 logging:
   level:
     root: INFO
-    com.zhizhi.ai: DEBUG
+    com.zhizhi.ai: INFO
     org.springframework.ai: INFO
